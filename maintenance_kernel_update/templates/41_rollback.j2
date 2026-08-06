@@ -1,0 +1,9 @@
+#!/bin/sh
+exec tail -n +3 $0
+# {{ ansible_managed }}
+
+{% if ansible_facts['distribution'] == 'Debian' %}
+{{ current_kernel_menuentry.stdout | replace(' (ANSIBLE ROLLBACK)', '') | replace("with Linux", "with Linux (ANSIBLE ROLLBACK)") }}
+{% elif ansible_facts['distribution'] == 'Astra Linux' %}
+{{ current_kernel_menuentry.stdout | replace(' (ANSIBLE ROLLBACK)', '') | replace("with Linux", "with Linux (ANSIBLE ROLLBACK)") | replace('old-vmlinuz-', 'vmlinuz-') | replace('vmlinuz-', 'old-vmlinuz-') }}
+{% endif %}

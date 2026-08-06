@@ -1,0 +1,39 @@
+- name: GRUB | Прочитать файл /etc/default/grub
+  ansible.builtin.slurp:
+    src: /etc/default/grub
+  register: grub_content
+
+- name: GRUB | Декодировать файл /etc/default/grub
+  ansible.builtin.set_fact:
+    grub_lines: "{{ (grub_content.content | b64decode).splitlines() }}"
+
+- name: GRUB | Найти GRUB_CMDLINE_LINUX_DEFAULT
+  ansible.builtin.set_fact:
+    default_line: >-
+      {{
+        (grub_lines
+        | select('search', '^GRUB_CMDLINE_LINUX_DEFAULT=')
+        | first) | default('')
+      }}
+
+- name: GRUB | Найти GRUB_CMDLINE_LINUX_HARDENED
+  ansible.builtin.set_fact:
+    hardened_line: >-
+      {{
+        (grub_lines
+        | select('search', '^GRUB_CMDLINE_LINUX_HARDENED=')
+        | first) | default('')
+      }}
+
+- name: GRUB | Настройка файла /etc/default/grub
+  ansible.builtin.template:
+    src: grub.j2
+    dest: /etc/default/grub
+    owner: root
+    group: root
+    mode: '644'
+  register: grub_template_result
+
+- name: GRUB | Обновить конфигурацию GRUB в системе
+  ansible.builtin.command: update-grub
+  when: grub_template_result.changed

@@ -1,0 +1,19 @@
+---
+#ntp_upstream_servers:
+#  - 10.0.2.23
+
+ntp_upstream_servers:
+  - ntp1.vniiftri.ru
+  - ntp2.vniiftri.ru
+  - ntp3.vniiftri.ru
+  - ntp4.vniiftri.ru
+  - ntp21.vniiftri.ru
+  - ntp.msk-ix.ru
+
+ntp_timezone: "Europe/Moscow"
+
+ntp_server: false
+
+ntp_allow_subnets:
+  - 172.20.0.0/16
+  - 10.0.0.0/8

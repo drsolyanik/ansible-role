@@ -1,0 +1,44 @@
+---
+- name: Time Sync | Устанавливаем часовой пояс
+  community.general.timezone:
+    name: "{{ ntp_timezone }}"
+
+- name: Time Sync | Установка пакета chrony
+  ansible.builtin.apt:
+    name: chrony
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Time Sync | Останавливаем и маскируем systemd-timesyncd
+  ansible.builtin.systemd:
+    name: systemd-timesyncd
+    state: stopped
+    enabled: false
+    masked: true
+  failed_when: false
+
+- name: Time Sync | Удаление альтернативных NTP-пакетов
+  ansible.builtin.apt:
+    name:
+      - systemd-timesyncd
+      - ntp
+      - openntpd
+      - ntpdate
+    state: absent
+
+- name: Time Sync | Настройка файла /etc/chrony/chrony.conf
+  ansible.builtin.template:
+    src: chrony.j2
+    dest: /etc/chrony/chrony.conf
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  notify: Restart Chrony
+
+- name: Time Sync | Обеспечиваем запуск и автозагрузку службы Chrony
+  ansible.builtin.systemd:
+    name: chrony
+    enabled: true
+    state: started

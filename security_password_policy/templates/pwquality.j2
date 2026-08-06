@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+# Managed by Ansible Role: security_password_policy
+
+minlen = {{ security_password_policy_minlen }}
+dcredit = {{ security_password_policy_dcredit }}
+ucredit = {{ security_password_policy_ucredit }}
+lcredit = {{ security_password_policy_lcredit }}
+ocredit = {{ security_password_policy_ocredit }}
+difok = {{ security_password_policy_difok }}
+maxrepeat = {{ security_password_policy_maxrepeat }}
+enforcing = 1
+{% if security_password_policy_local_users_only %}
+local_users_only
+{% endif %}

@@ -1,0 +1,5 @@
+# {{ ansible_managed }}
+# Managed by Ansible Role: system_zabbix_agent2
+{% for sudo_command in zabbix_agent_sudo_commands_default + (zabbix_agent_sudo_commands_custom | default([])) %}
+zabbix ALL=(root) NOPASSWD: {{ sudo_command }}
+{% endfor %}

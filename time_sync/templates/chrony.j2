@@ -1,0 +1,50 @@
+# {{ ansible_managed }}
+# Managed by Ansible Role: time_sync
+
+confdir /etc/chrony/conf.d
+
+# ==============================================================================
+# ИСТОЧНИКИ ВРЕМЕНИ
+# ==============================================================================
+{% if ntp_upstream_servers | length >= 2 %}
+minsources 2
+{% else %}
+minsources 1
+{% endif %}
+
+{% for source_server in ntp_upstream_servers %}
+server {{ source_server }} iburst
+{% endfor %}
+
+# Системные источники
+sourcedir /run/chrony-dhcp
+sourcedir /etc/chrony/sources.d
+
+# ==============================================================================
+# СИСТЕМНЫЕ ПАРАМЕТРЫ
+# ==============================================================================
+keyfile /etc/chrony/chrony.keys
+driftfile /var/lib/chrony/chrony.drift
+ntsdumpdir /var/lib/chrony
+logdir /var/log/chrony
+
+maxupdateskew 100.0
+rtcsync
+makestep 1 3
+leapsectz right/UTC
+
+{% if ntp_server | default(false) %}
+# ==============================================================================
+# НАСТРОЙКИ СЕРВЕРА
+# ==============================================================================
+# Разрешенные подсети для клиентов:
+{% for subnet in ntp_allow_subnets | default([]) %}
+allow {{ subnet }}
+{% endfor %}
+
+# Rate limiting: не более 1 ответа в ~8 секунд. Защита от флуда внутри сети 
+ratelimit interval 3 burst 2
+
+# Отдавать время локально при обрыве связи с внешними источниками
+local stratum 10
+{% endif %}

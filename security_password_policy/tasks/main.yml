@@ -1,0 +1,45 @@
+---
+- name: Pre-flight | Проверка поддерживаемой операционной системы
+  ansible.builtin.assert:
+    that:
+      - (ansible_facts['os_family'] in ['Debian', 'Astra Linux']) or
+        (ansible_facts['distribution'] in ['Debian', 'Astra Linux', 'Ubuntu'])
+    fail_msg: >-
+      Ошибка: Роль не может быть выполнена на этом сервере!
+      Текущая ОС: {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}).
+      Поддерживаемые дистрибутивы: Debian, Astra Linux, Ubuntu.
+    success_msg: "ОС {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}) поддерживается ролью."
+
+- name: Password Policy | Установка libpam-pwquality
+  ansible.builtin.apt:
+    name: libpam-pwquality
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Password Policy | Актуализация профилей PAM через pam-auth-update
+  ansible.builtin.command: /usr/sbin/pam-auth-update --package
+  register: pam_auth_update_exec
+  failed_when: pam_auth_update_exec.rc != 0
+  changed_when: false
+
+- name: Password Policy | Настройка параметров парольной политики в /etc/security/pwquality.conf
+  ansible.builtin.template:
+    src: pwquality.j2
+    dest: /etc/security/pwquality.conf
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Password Policy | Настройка параметров парольной политики в /etc/login.defs
+  ansible.builtin.lineinfile:
+    path: /etc/login.defs
+    regexp: '^\s*{{ item.key }}\b'
+    line: '{{ item.key }} {{ item.value }}'
+    state: present
+    backup: true
+  loop:
+    - { key: 'PASS_MAX_DAYS', value: '{{ security_password_policy_max_days }}' }
+    - { key: 'PASS_MIN_DAYS', value: '{{ security_password_policy_min_days }}' }
+    - { key: 'PASS_WARN_AGE', value: '{{ security_password_policy_warn_age }}' }
+    - { key: 'ENCRYPT_METHOD', value: '{{ security_password_policy_encrypt_method }}' }

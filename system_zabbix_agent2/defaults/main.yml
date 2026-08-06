@@ -1,0 +1,150 @@
+---
+# ==========================================
+# 1. ZABBIX SERVER & API (Подключение и авторегистрация)
+# ==========================================
+zabbix_server_port: 80
+zabbix_server_use_ssl: false
+zabbix_server_validate_certs: false
+zabbix_server_url_path: "zabbix"
+
+zabbix_agent_host_groups:
+  - "Linux servers"
+
+zabbix_agent_link_templates:
+  - "Custom Linux by Zabbix agent"
+
+zabbix_agent_host_metadata: "Linux_servers"
+
+# ==========================================
+# 2. СЕТЬ И ИДЕНТИФИКАЦИЯ АГЕНТА
+# ==========================================
+zabbix_agent_hostname: "{{ ansible_facts['hostname'] }}"
+zabbix_agent_server: "10.0.2.13"
+zabbix_agent_server_active: "10.0.2.13"
+zabbix_agent_listen_port: 10050
+
+# ==========================================
+# 3. БЕЗОПАСНОСТЬ И ШИФРОВАНИЕ (TLS PSK)
+# ==========================================
+zabbix_agent_tls_enable: true
+zabbix_agent_tls_connect: "psk"
+zabbix_agent_tls_accept: "psk"
+zabbix_agent_tls_psk_identity: "PSK_{{ ansible_facts['hostname'] }}"
+zabbix_agent_tls_psk_file: "/etc/zabbix/zabbix_agent2.psk"
+zabbix_agent_regenerate_psk: false
+
+# ==========================================
+# 4. КАСТОМНЫЕ РАСШИРЕНИЯ (Для переопределения на уровнях хостов/групп)
+# ==========================================
+# Переопределяйте эти переменные в host_vars / group_vars
+zabbix_agent_user_parameters_custom: []
+zabbix_agent_allow_key_custom: []
+zabbix_agent_sudo_commands_custom: []
+zabbix_agent_extra_groups: []
+zabbix_agent_extra_templates: []
+zabbix_agent_extra_config: {}
+
+# ==========================================
+# 5. СИСТЕМНЫЕ НАСТРОЙКИ И ЛОГИРОВАНИЕ
+# ==========================================
+zabbix_agent_timeout: 30
+zabbix_agent_debug_level: 3
+zabbix_agent_log_type: "file"
+zabbix_agent_log_file: "/var/log/zabbix/zabbix_agent2.log"
+zabbix_agent_log_file_size: 100
+zabbix_agent_log_remote_commands: 1
+zabbix_agent_control_socket: "/run/zabbix/agent.sock"
+
+zabbix_agent_include_dirs:
+  - "/etc/zabbix/zabbix_agent2.d/*.conf"
+  - "/etc/zabbix/zabbix_agent2.d/plugins.d/*.conf"
+
+# ==========================================
+# 6. БАЗОВЫЕ ПРАВИЛА БЕЗОПАСНОСТИ (ALLOW / DENY)
+# ==========================================
+zabbix_agent_deny_all_keys: true
+
+# ==========================================
+# 7. ДЕФОЛТНЫЕ СПИСКИ И СКРИПТЫ (Статичные данные)
+# ==========================================
+zabbix_agent_user_parameters_default:
+  - name: "systemd.services.discovery"
+    command: "sudo /usr/local/bin/zbx_discovery_services.sh"
+  - name: "service.check[*]"
+    command: "sudo /usr/local/bin/service_check.sh \"$1\" \"$2\""
+
+zabbix_agent_sudo_commands_default:
+  - "/usr/local/bin/zbx_discovery_services.sh"
+  - "/usr/local/bin/service_check.sh *"
+
+zabbix_agent_allow_key_default:
+  - "agent.hostname"
+  - "agent.ping"
+  - "agent.version"
+  - "kernel.maxfiles"
+  - "kernel.maxproc"
+  - "proc.num"
+  - "proc.num[*]"
+  - "system.boottime"
+  - "system.cpu.intr"
+  - "system.cpu.load[all,avg1]"
+  - "system.cpu.load[all,avg5]"
+  - "system.cpu.load[all,avg15]"
+  - "system.cpu.num"
+  - "system.cpu.switches"
+  - "system.cpu.util"
+  - "system.cpu.util[,guest]"
+  - "system.cpu.util[,guest_nice]"
+  - "system.cpu.util[,idle]"
+  - "system.cpu.util[,interrupt]"
+  - "system.cpu.util[,iowait]"
+  - "system.cpu.util[,nice]"
+  - "system.cpu.util[,softirq]"
+  - "system.cpu.util[,steal]"
+  - "system.cpu.util[,system]"
+  - "system.cpu.util[,user]"
+  - "system.hostname"
+  - "system.localtime"
+  - "system.sw.arch"
+  - "system.sw.os"
+  - "system.sw.packages.get"
+  - "system.swap.size[,free]"
+  - "system.swap.size[,pfree]"
+  - "system.swap.size[,total]"
+  - "system.uname"
+  - "system.uptime"
+  - "system.users.num"
+  - "vfs.file.cksum[/etc/passwd,sha256]"
+  - "vfs.fs.get"
+  - "vm.memory.size[available]"
+  - "vm.memory.size[pavailable]"
+  - "vm.memory.size[total]"
+  - "vm.memory.utilization"
+  - "zabbix[host,agent,available]"
+  - "vfs.dev.discovery"
+  - "vfs.dev.queue_size[*]"
+  - "vfs.dev.read.rate[*]"
+  - "vfs.dev.read.await[*]"
+  - "vfs.dev.read.time.rate[*]"
+  - "vfs.dev.util[*]"
+  - "vfs.dev.write.rate[*]"
+  - "vfs.dev.write.await[*]"
+  - "vfs.dev.write.time.rate[*]"
+  - "vfs.file.contents[/sys/block/*/stat]"
+  - "systemd.services.discovery"
+  - "service.check[*,cpu]"
+  - "service.check[*,mem]"
+  - "service.check[*,state]"
+  - "service.check[*,type]"
+  - "vfs.fs.dependent.discovery"
+  - "vfs.fs.dependent[*,data]"
+  - "vfs.fs.dependent.inode[*,pfree]"
+  - "vfs.fs.dependent[*,readonly]"
+  - "vfs.fs.dependent.size[*,free]"
+  - "vfs.fs.dependent.size[*,total]"
+  - "vfs.fs.dependent.size[*,used]"
+  - "vfs.fs.dependent.size[*,pused]"
+  - "net.if.discovery"
+  - "net.if.in[*]"
+  - "net.if.out[*]"
+  - "vfs.file.contents[*]"

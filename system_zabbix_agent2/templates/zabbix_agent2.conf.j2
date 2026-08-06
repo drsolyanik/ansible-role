@@ -1,0 +1,219 @@
+# {{ ansible_managed }}
+# Managed by Ansible Role: system_zabbix_agent2
+
+# ==========================================
+# 1. ОСНОВНЫЕ ПАРАМЕТРЫ СЕТИ И ИДЕНТИФИКАЦИИ
+# ==========================================
+
+### Option: Server
+#       List of comma delimited IP addresses, optionally in CIDR notation, or DNS names of Zabbix servers and Zabbix proxies.
+#       Incoming connections will be accepted only from the hosts listed here.
+#       If IPv6 support is enabled then '127.0.0.1', '::127.0.0.1', '::ffff:127.0.0.1' are treated equally
+#       and '::/0' will allow any IPv4 or IPv6 address.
+#       '0.0.0.0/0' can be used to allow any IPv4 address.
+#       Example: Server=127.0.0.1,192.168.1.0/24,::1,2001:db8::/32,zabbix.example.com
+# Default:
+Server={{ zabbix_agent_server }}
+
+### Option: ServerActive
+#       Zabbix server/proxy address or cluster configuration to get active checks from.
+#       Server/proxy address is IP address or DNS name and optional port separated by colon.
+#       Cluster configuration is one or more server addresses separated by semicolon.
+#       Multiple Zabbix servers/clusters and Zabbix proxies can be specified, separated by comma.
+#       More than one Zabbix proxy should not be specified from each Zabbix server/cluster.
+#       If Zabbix proxy is specified then Zabbix server/cluster for that proxy should not be specified.
+#       Multiple comma-delimited addresses can be provided to use several independent Zabbix servers in parallel. Spaces are allowed.
+#       If port is not specified, default port is used.
+#       IPv6 addresses must be enclosed in square brackets if port for that host is specified.
+#       If port is not specified, square brackets for IPv6 addresses are optional.
+#       If this parameter is not specified, active checks are disabled.
+# Default:
+ServerActive={{ zabbix_agent_server_active }}
+
+### Option: Hostname
+#       List of comma delimited unique, case sensitive hostnames.
+#       Required for active checks and must match hostnames as configured on the server.
+#       Value is acquired from HostnameItem if undefined.
+# Default:
+Hostname={{ (zabbix_agent_hostname | default(ansible_facts['hostname'])) }}
+
+{% if zabbix_agent_host_metadata is defined and zabbix_agent_host_metadata | length > 0 %}
+### Option: HostMetadata
+#       Optional parameter that defines host metadata.
+#       Host metadata is used at host auto-registration process.
+#       An agent will issue an error and not start if the value is over limit of 2034 bytes.
+#       If not defined, value will be acquired from HostMetadataItem.
+# Range: 0-2034 bytes
+# Default:
+HostMetadata={{ zabbix_agent_host_metadata }}
+{% endif %}
+
+### Option: ListenPort
+#       Agent will listen on this port for connections from the server.
+# Range: 1024-32767
+# Default: ListenPort=10050
+ListenPort={{ zabbix_agent_listen_port }}
+
+
+# ==========================================
+# 2. ЛОГИРОВАНИЕ И СИСТЕМНЫЕ НАСТРОЙКИ
+# ==========================================
+
+### Option: LogType
+#       Specifies where log messages are written to:
+#               system  - syslog
+#               file    - file specified with LogFile parameter
+#               console - standard output
+# Default: LogType=file
+LogType={{ zabbix_agent_log_type }}
+
+### Option: LogFile
+#       Log file name for LogType 'file' parameter.
+#
+# Mandatory: yes, if LogType is set to file, otherwise no
+# Default: LogFile=/tmp/zabbix_agent2.log
+LogFile={{ zabbix_agent_log_file }}
+
+### Option: LogFileSize
+#       Maximum size of log file in MB.
+#       0 - disable automatic log rotation.
+# Range: 0-1024
+# Default: LogFile=/tmp/zabbix_agent2.log
+LogFileSize={{ zabbix_agent_log_file_size }}
+
+### Option: DebugLevel
+#       Specifies debug level:
+#       0 - basic information about starting and stopping of Zabbix processes
+#       1 - critical information
+#       2 - error information
+#       3 - warnings
+#       4 - for debugging (produces lots of information)
+#       5 - extended debugging (produces even more information)
+# Range: 0-5
+# Default: DebugLevel=3
+DebugLevel={{ zabbix_agent_debug_level }}
+
+### Option: PidFile
+#       Name of PID file.
+# Default: PidFile=/tmp/zabbix_agent2.pid
+PidFile=/run/zabbix/zabbix_agent2.pid
+
+### Option: ControlSocket
+#       The control socket, used to send runtime commands with '-R' option.
+# Default: ControlSocket=/tmp/agent.sock
+ControlSocket={{ zabbix_agent_control_socket }}
+
+### Option: Timeout
+#       Specifies timeout for communications (in seconds).
+# Range: 1-30
+# Default: Timeout=3
+Timeout={{ zabbix_agent_timeout }}
+
+
+# ==========================================
+# 3. ИНКЛУДЫ И НАСТРОЙКИ ПЛАГИНОВ
+# ==========================================
+
+### Option: Include
+#       You may include individual files or all files in a directory in the configuration file.
+#       Installing Zabbix will create include directory in /usr/local/etc, unless modified during the compile time.
+# Default: Include=/etc/zabbix/zabbix_agent2.d/*.conf
+# Include=/usr/local/etc/zabbix_agent2.conf.d/
+{% for include_path in zabbix_agent_include_dirs %}
+Include={{ include_path }}
+{% endfor %}
+
+### Option: Plugins.SystemRun.LogRemoteCommands
+#       Enable logging of executed shell commands as warnings.
+#       0 - disabled
+#       1 - enabled
+#
+# Mandatory: no
+# Default: Plugins.SystemRun.LogRemoteCommands=1
+Plugins.SystemRun.LogRemoteCommands={{ zabbix_agent_log_remote_commands }}
+
+{% if zabbix_agent_extra_config is defined and zabbix_agent_extra_config | length > 0 %}
+### Custom Plugin Extra Configs
+{% for key, value in zabbix_agent_extra_config.items() %}
+{{ key }}={{ value }}
+{% endfor %}
+{% endif %}
+
+
+# ==========================================
+# 4. ПОЛЬЗОВАТЕЛЬСКИЕ ПАРАМЕТРЫ
+# ==========================================
+
+### Option: UserParameter
+#       User-defined parameter to monitor. There can be several user-defined parameters.
+#       Format: UserParameter=<key>,<shell command>
+#       See 'zabbix_agentd' directory for examples.
+# --- Default UserParameters ---
+{% for param in zabbix_agent_user_parameters_default %}
+UserParameter={{ param.name }},{{ param.command }}
+{% endfor %}
+
+# --- Custom UserParameters (Host/Group specific) ---
+{% for param in zabbix_agent_user_parameters_custom %}
+UserParameter={{ param.name }},{{ param.command }}
+{% endfor %}
+
+
+# ==========================================
+# 5. ОГРАНИЧЕНИЯ ДОСТУПА К КЛЮЧАМ (ALLOW / DENY)
+# ==========================================
+
+{% if zabbix_agent_allow_key_default | length > 0 or zabbix_agent_allow_key_custom | length > 0 %}
+### Option: AllowKey
+#       Allow execution of item keys matching pattern.
+#       Multiple keys matching rules may be defined in combination with DenyKey.
+#       Key pattern is wildcard expression, which support "*" character to match any number of any characters in certain position.
+#       Parameters are processed one by one according their appearance order.
+#       If no AllowKey or DenyKey rules defined, all keys are allowed.
+{% for key in zabbix_agent_allow_key_default + zabbix_agent_allow_key_custom %}
+AllowKey={{ key }}
+{% endfor %}
+{% endif %}
+
+{% if zabbix_agent_deny_all_keys | default(true) | bool %}
+### Option: DenyKey
+#       Deny execution of items keys matching pattern.
+#       Multiple keys matching rules may be defined in combination with AllowKey.
+#       Key pattern is wildcard expression, which support "*" character to match any number of any characters in certain position. It might be used in both key name and key arguments.
+#       Parameters are processed one by one according their appearance order.
+#       If no AllowKey or DenyKey rules defined, all keys are allowed.
+#       Unless another system.run[*] rule is specified DenyKey=system.run[*] is added by default.
+# Default: DenyKey=system.run[*]
+DenyKey=*
+{% endif %}
+
+
+# ==========================================
+# 6. ШИФРОВАНИЕ И БЕЗОПАСНОСТЬ (TLS)
+# ==========================================
+
+{% if zabbix_agent_tls_enable | default(true) | bool %}
+### Option: TLSConnect
+#       How the agent should connect to server or proxy. Used for active checks.
+#       Only one value can be specified:
+#               unencrypted - connect without encryption
+#               psk         - connect using TLS and a pre-shared key
+#               cert        - connect using TLS and a certificate
+TLSConnect={{ zabbix_agent_tls_connect }}
+
+### Option: TLSAccept
+#       What incoming connections to accept.
+#       Multiple values can be specified, separated by comma:
+#               unencrypted - accept connections without encryption
+#               psk         - accept connections secured with TLS and a pre-shared key
+#               cert        - accept connections secured with TLS and a certificate
+TLSAccept={{ zabbix_agent_tls_accept }}
+
+### Option: TLSPSKIdentity
+#       Unique, case sensitive string used to identify the pre-shared key.
+TLSPSKIdentity={{ zabbix_agent_tls_psk_identity }}
+
+### Option: TLSPSKFile
+#       Full pathname of a file containing the pre-shared key.
+TLSPSKFile={{ zabbix_agent_tls_psk_file }}
+{% endif %}

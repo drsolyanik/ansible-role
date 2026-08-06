@@ -1,0 +1,166 @@
+---
+- name: Pre-flight | Проверка поддерживаемой операционной системы
+  ansible.builtin.assert:
+    that:
+      - (ansible_facts['os_family'] in ['Debian', 'Astra Linux']) or
+        (ansible_facts['distribution'] in ['Debian', 'Astra Linux'])
+    fail_msg: >-
+      Ошибка: Роль не может быть выполнена на этом сервере!
+      Текущая ОС: {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}).
+      Поддерживаемые дистрибутивы: Debian, Astra Linux.
+    success_msg: "ОС {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}) поддерживается роли."
+
+- name: Zabbix Agent | Остановка и отключение старого zabbix-agent
+  ansible.builtin.systemd:
+    name: zabbix-agent
+    state: stopped
+    enabled: false
+  failed_when: false
+
+- name: Zabbix Agent | Удаление старого пакета zabbix-agent
+  ansible.builtin.apt:
+    name: zabbix-agent
+    state: absent
+    purge: true
+  failed_when: false
+
+- name: Zabbix Agent | Проверка наличия бинарного файла zabbix_agent2
+  ansible.builtin.stat:
+    path: /usr/sbin/zabbix_agent2
+  register: zabbix_agent2_binary
+
+- name: Zabbix Agent | Блок установки пакета
+  block:
+    - name: Zabbix Agent | Установка zabbix-agent2 на Astra Linux
+      ansible.builtin.apt:
+        name: zabbix-agent2
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_facts['distribution'] == 'Astra Linux'
+
+    - name: Zabbix Agent | Установка zabbix-agent2 на Debian
+      block:
+        - name: Zabbix Agent | Копирование пакета zabbix-agent2 на целевой сервер
+          ansible.builtin.copy:
+            src: "{{ item }}"
+            dest: "/tmp/zabbix-agent2.deb"
+            owner: root
+            group: root
+            mode: '0644'
+          with_first_found:
+            - files:
+                - "zabbix-agent2_{{ ansible_facts['distribution'] }}_{{ ansible_facts['distribution_major_version'] }}.deb"
+                - "zabbix-agent2_{{ ansible_facts['distribution'] }}.deb"
+                - "zabbix-agent2.deb"
+              skip: true
+
+        - name: Zabbix Agent | Установка zabbix-agent2 из локального deb-файла
+          ansible.builtin.apt:
+            deb: "/tmp/zabbix-agent2.deb"
+            cache_valid_time: 3600
+
+      always:
+        - name: Zabbix Agent | Удаление временного deb-пакета
+          ansible.builtin.file:
+            path: "/tmp/zabbix-agent2.deb"
+            state: absent
+      when: ansible_facts['distribution'] == 'Debian'
+  when: not zabbix_agent2_binary.stat.exists
+
+- name: Zabbix Agent | Развертывание мониторинговых скриптов
+  ansible.builtin.copy:
+    src: "{{ item.file }}"
+    dest: /usr/local/bin/{{ item.file }}
+    owner: root
+    group: root
+    mode: '0750'
+  loop:
+    - { file: 'zbx_discovery_services.sh' }
+    - { file: 'service_check.sh' }
+
+- name: Zabbix Agent | Настройка прав Sudoers
+  ansible.builtin.template:
+    src: sudoers_zabbix.j2
+    dest: /etc/sudoers.d/zabbix_custom
+    owner: root
+    group: root
+    mode: '0440'
+    validate: /usr/sbin/visudo -cf %s
+
+- name: TLS PSK | Блок подготовки и генерации PSK
+  block:
+    - name: TLS PSK | Проверка наличия PSK-файла на целевом хосте
+      ansible.builtin.stat:
+        path: "{{ zabbix_agent_tls_psk_file }}"
+      register: zabbix_psk_file_stat
+
+    - name: TLS PSK | Генерация PSK-ключа
+      ansible.builtin.shell:
+        cmd: "openssl rand -hex 32 > {{ zabbix_agent_tls_psk_file }}"
+      when: not zabbix_psk_file_stat.stat.exists or (zabbix_agent_regenerate_psk | default(false) | bool)
+      notify: Restart zabbix-agent2
+
+    - name: TLS PSK | Настройка прав доступа на PSK-файл
+      ansible.builtin.file:
+        path: "{{ zabbix_agent_tls_psk_file }}"
+        owner: root
+        group: zabbix
+        mode: '0640'
+
+    - name: TLS PSK | Считывание PSK-ключа для передачи в Zabbix API
+      ansible.builtin.slurp:
+        src: "{{ zabbix_agent_tls_psk_file }}"
+      register: zabbix_psk_slurp
+
+    - name: TLS PSK | Сохранение значение ключа в переменную
+      ansible.builtin.set_fact:
+        zabbix_psk_secret_value: "{{ zabbix_psk_slurp['content'] | b64decode | trim }}"
+      no_log: true
+
+  when: zabbix_agent_tls_enable | default(true) | bool
+
+- name: Zabbix API | Регистрация и настройка TLS PSK на Zabbix Server
+  vars:
+    ansible_network_os: community.zabbix.zabbix
+    ansible_connection: httpapi
+    ansible_httpapi_port: "{{ zabbix_server_port }}"
+    ansible_httpapi_use_ssl: "{{ zabbix_server_use_ssl }}"
+    ansible_httpapi_validate_certs: "{{ zabbix_server_validate_certs }}"
+    ansible_zabbix_url_path: "{{ zabbix_server_url_path }}"
+    ansible_zabbix_auth_key: "{{ vault_zabbix_server_api_token }}"
+  delegate_to: zabbix.sdr.lan
+  become: false
+  no_log: true
+  community.zabbix.zabbix_host:
+    host_name: "{{ (zabbix_agent_hostname | default(ansible_facts['hostname'])) }}"
+    visible_name: "{{ (zabbix_agent_hostname | default(ansible_facts['hostname'])) }}"
+    host_groups: "{{ (zabbix_agent_host_groups | default(['Linux servers'])) | union(zabbix_agent_extra_groups | default([])) }}"
+    link_templates: "{{ (zabbix_agent_link_templates | default(['Custom Linux by Zabbix agent'])) | union(zabbix_agent_extra_templates | default([])) }}"
+    interfaces:
+      - type: 1
+        main: 1
+        useip: 1
+        ip: "{{ ansible_default_ipv4.address }}"
+        dns: ""
+        port: "10050"
+    tls_connect: "{{ 2 if (zabbix_agent_tls_enable | default(true) | bool) else 1 }}"
+    tls_accept: "{{ 2 if (zabbix_agent_tls_enable | default(true) | bool) else 1 }}"
+    tls_psk_identity: "{{ zabbix_agent_tls_psk_identity if (zabbix_agent_tls_enable | default(true) | bool) else omit }}"
+    tls_psk: "{{ zabbix_psk_secret_value if (zabbix_agent_tls_enable | default(true) | bool) else omit }}"
+
+- name: Zabbix Agent | Настройка конфигурации zabbix_agent2.conf
+  ansible.builtin.template:
+    src: "zabbix_agent2.conf.j2"
+    dest: "/etc/zabbix/zabbix_agent2.conf"
+    owner: root
+    group: zabbix
+    mode: '0640'
+    validate: "/usr/sbin/zabbix_agent2 -c %s -t system.uptime"
+  notify: Restart zabbix-agent2
+
+- name: Zabbix Agent | Обеспечиваем запуск и автозагрузку сервиса zabbix-agent2
+  ansible.builtin.systemd:
+    name: zabbix-agent2
+    enabled: true
+    state: started

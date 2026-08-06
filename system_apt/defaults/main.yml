@@ -1,0 +1,52 @@
+---
+apt_default_repositories_map:
+  Debian_12:
+    - "deb http://ftp.by.debian.org/debian/ bookworm main non-free-firmware"
+    - "deb-src http://ftp.by.debian.org/debian/ bookworm main non-free-firmware"
+    - "deb http://security.debian.org/debian-security bookworm-security main non-free-firmware"
+    - "deb-src http://security.debian.org/debian-security bookworm-security main non-free-firmware"
+    - "deb http://ftp.by.debian.org/debian/ bookworm-updates main non-free-firmware"
+    - "deb-src http://ftp.by.debian.org/debian/ bookworm-updates main non-free-firmware"
+  Astra_Linux_1.8:
+    - "deb https://download.astralinux.ru/astra/stable/1.8_x86-64/repository-extended/ 1.8_x86-64 main contrib non-free non-free-firmware"
+    - "deb https://download.astralinux.ru/astra/stable/1.8_x86-64/repository-main/ 1.8_x86-64 main contrib non-free non-free-firmware"
+  Astra_Linux_1.7:
+    - "deb http://download.astralinux.ru/astra/stable/1.7_x86-64/repository-main/ 1.7_x86-64 main contrib non-free"
+
+apt_os_key_version: "{{ (ansible_facts['distribution'] | replace(' ', '_')) ~ '_' ~ (ansible_facts['distribution_version'].split('_')[0]) }}"
+apt_os_key_major: "{{ (ansible_facts['distribution'] | replace(' ', '_')) ~ '_' ~ (ansible_facts['distribution_major_version']) }}"
+
+apt_repositories: "{{ apt_default_repositories_map[apt_os_key_version] | default(apt_default_repositories_map[apt_os_key_major]) | default([]) }}"
+
+apt_update_cache_valid_time: 3600
+apt_base_packages:
+  - ca-certificates
+  - curl
+  - gnupg
+  - atop
+  - htop
+  - sysstat
+  - lsof
+  - psmisc
+  - strace
+  - jq
+  - iproute2
+  - dnsutils
+  - tcpdump
+  - netcat-openbsd
+  - telnet
+  - traceroute
+  - rsync
+  - zip
+  - unzip
+  - tar
+  - tree
+  - findutils
+  - diffutils
+  - less
+  - vim
+  - nano
+
+apt_extra_packages: []
+
+apt_packages: "{{ apt_base_packages + (apt_extra_packages | default([])) }}"

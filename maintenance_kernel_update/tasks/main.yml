@@ -1,0 +1,150 @@
+---
+# ================================================================
+# БЛОК 1: Подготовка, превалидация и фиксация Baseline
+# ================================================================
+- name: Подключение файла переменных на основе фактов ОС
+  ansible.builtin.include_vars: "{{ item }}"
+  with_first_found:
+    - files:
+        - "{{ ansible_facts['distribution'] | replace(' ', '_') }}_{{ ansible_facts['distribution_version'].split('_')[0] }}.yml"
+        - "{{ ansible_facts['distribution'] | replace(' ', '_') }}_{{ ansible_facts['distribution_major_version'] }}.yml"
+        - "default.yml"
+      paths:
+        - "vars"
+
+- name: Проверить наличие переменной target_kernel_package
+  ansible.builtin.fail:
+    msg: >-
+      Критическая ошибка: Переменная 'target_kernel_package' не задана или пуста для хоста {{ inventory_hostname }}.
+      Убедитесь, что хост находится в правильной группе инвентаря и для него настроен файл в group_vars.
+  when: target_kernel_package is not defined or target_kernel_package | default('', true) | trim == ''
+
+- name: Настройка параметров /etc/default/grub
+  ansible.builtin.include_role:
+    name: grub
+
+- name: Сохранить версию запущенного ядра до обновления
+  ansible.builtin.set_fact:
+    current_kernel_version_before_update: "{{ ansible_facts['kernel'] | trim }}"
+
+- name: Извлечь конфигурацию menuentry для текущего ядра (для будущего Rollback)
+  ansible.builtin.shell: |
+    awk '/menuentry.*{{ current_kernel_version_before_update }}/ {found=1; braces=0} found {print; braces+=gsub("{", "{"); braces-=gsub("}", "}"); if (braces==0) {found=0; exit}}' /boot/grub/grub.cfg
+  register: current_kernel_menuentry
+  changed_when: false
+  failed_when: current_kernel_menuentry.stdout == ""
+
+
+# ================================================================
+# БЛОК 2: Установка целевого ядра и детекция версий
+# ================================================================
+- name: Установить целевой метапакет ядра
+  ansible.builtin.apt:
+    name: "{{ target_kernel_package }}"
+    state: latest
+    update_cache: true
+  register: apt_kernel_result
+
+- name: Определить самую свежую версию установленного ядра в /boot
+  ansible.builtin.shell: |
+    ls -1 /boot/vmlinuz-* | grep -v 'old-vmlinuz' | sed 's|/boot/vmlinuz-||' | sort -V | tail -n 1
+  register: new_kernel_version_cmd
+  changed_when: false
+
+- name: Сохранить версию нового ядра в факт
+  ansible.builtin.set_fact:
+    new_kernel_version: "{{ new_kernel_version_cmd.stdout | trim }}"
+
+
+# ================================================================
+# БЛОК 3 и 4: Безопасный запуск, верификация и фиксация
+# (Запускается только если версия ядра на диске отличается от запущенного)
+# ================================================================
+- name: Основной блок безопасного обновления ядра
+  block:
+
+    # ------------------------------------------------------------
+    # БЛОК 3: Конфигурирование Rollback и разовый тестовый запуск
+    # ------------------------------------------------------------
+    - name: Сформировать название кастомного Rollback-ядра
+      ansible.builtin.set_fact:
+        grub_default_kernel: |-
+          {% set first_line = current_kernel_menuentry.stdout.splitlines() | first -%}
+          {% set title = first_line.split("'")[1] if "'" in first_line else first_line.split('"')[1] -%}
+          {{ title | replace('with Linux', 'with Linux (ANSIBLE ROLLBACK)') | trim }}
+      failed_when: grub_default_kernel is none or grub_default_kernel | trim == ''
+
+    - name: Создать конфигурацию ROLLBACK ядра /etc/grub.d/41_rollback
+      ansible.builtin.template:
+        src: 41_rollback.j2
+        dest: /etc/grub.d/41_rollback
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Обновить конфигурацию GRUB
+      ansible.builtin.command: update-grub
+
+    - name: Назначить ROLLBACK ядро загрузкой по умолчанию
+      ansible.builtin.command: grub-set-default "{{ grub_default_kernel }}"
+
+    - name: Спарсить grub.cfg и определить точно путь к новому ядру
+      ansible.builtin.shell: |
+        python3 -c "
+        import re
+        sub = ''
+        for l in open('/boot/grub/grub.cfg'):
+            if l.strip().startswith('submenu'): sub = re.findall(r'[\'\"]([^\'\"]+)[\'\"]', l)[0] + '>'
+            if l.strip().startswith('menuentry') and '{{ new_kernel_version }}' in l and 'recovery' not in l:
+                print(sub + re.findall(r'[\'\"]([^\'\"]+)[\'\"]', l)[0]); break
+        "
+      register: grub_entry_path
+      changed_when: false
+      failed_when: grub_entry_path.stdout == ""
+
+    - name: Активировать разовую загрузку нового ядра (grub-reboot)
+      ansible.builtin.command: "grub-reboot '{{ grub_entry_path.stdout | trim }}'"
+      changed_when: true
+
+    - name: Имитировать Kernel panic (вызывается только вручную через --tags)
+      ansible.builtin.command: "mv /boot/initrd.img-{{ new_kernel_version }} /boot/initrd.img-{{ new_kernel_version }}.bak"
+      changed_when: false
+      tags:
+        - never
+        - kernel_panic_test
+
+    - name: Перезагрузить хост для проверки нового ядра
+      ansible.builtin.reboot:
+        msg: "Ansible инициирует тестовое обновление ядра на версию {{ new_kernel_version }}"
+        reboot_timeout: 900
+        post_reboot_delay: 60
+
+    # ------------------------------------------------------------
+    # БЛОК 4: Пост-ребут верификация и фиксация успеха
+    # ------------------------------------------------------------
+    - name: Получить версию реально запущенного ядра после перезагрузки
+      ansible.builtin.command: uname -r
+      register: current_kernel_version_after_update_cmd
+      changed_when: false
+
+    - name: Сохранить текущую версию запущенного ядра в факт
+      ansible.builtin.set_fact:
+        current_kernel_version: "{{ current_kernel_version_after_update_cmd.stdout | trim }}"
+
+    - name: Проверить соответствие запущенного ядра целевой версии
+      ansible.builtin.fail:
+        msg: >-
+          Критическая ошибка! После перезагрузки система вернулась на прежнее ядро {{ current_kernel_version }}.
+          Вероятнее всего, новое ядро {{ new_kernel_version }} вызвало Kernel Panic, и сработал автоматический откат GRUB.
+          Требуется ручное вмешательство администратора.
+      when: current_kernel_version != new_kernel_version
+
+    - name: Зафиксировать новое ядро как постоянную загрузку по умолчанию
+      ansible.builtin.command: "grub-set-default '{{ grub_entry_path.stdout | trim }}'"
+      changed_when: true
+
+    - name: Вывод лога об успешном обновлении
+      ansible.builtin.debug:
+        msg: "Успех! Хост {{ inventory_hostname }} успешно обновлен и загружен на ядре {{ current_kernel_version }}."
+
+  when: new_kernel_version != current_kernel_version_before_update

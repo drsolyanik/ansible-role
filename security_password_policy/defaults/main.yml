@@ -1,0 +1,16 @@
+---
+# Настройки сложности паролей (/etc/security/pwquality.conf)
+security_password_policy_minlen: 12
+security_password_policy_dcredit: -1
+security_password_policy_ucredit: -1
+security_password_policy_lcredit: -1
+security_password_policy_ocredit: -1
+security_password_policy_difok: 4
+security_password_policy_maxrepeat: 3
+security_password_policy_local_users_only: true
+
+# Настройки сроков действия и шифрования (/etc/login.defs)
+security_password_policy_max_days: 90
+security_password_policy_min_days: 7
+security_password_policy_warn_age: 14
+security_password_policy_encrypt_method: "YESCRYPT"

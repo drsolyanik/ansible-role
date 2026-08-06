@@ -75,7 +75,6 @@ collections:
 # Сеть и идентификация
 zabbix_agent_server: "127.0.0.1,10.0.2.13"
 zabbix_agent_server_active: "127.0.0.1,10.0.2.13"
-zabbix_agent_hostname_item: "Zabbix server"
 
 # Пользовательские метрики (UserParameter)
 zabbix_agent_user_parameters_custom:

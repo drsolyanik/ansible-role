@@ -40,7 +40,7 @@
       executable: /bin/bash
 
   always:
-  - name: Удалить временные файлы ключей
+  - name: System APT | Удалить временные файлы ключей
     ansible.builtin.file:
       path: "/tmp/{{ item.key }}.raw.key"
       state: absent

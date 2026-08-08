@@ -34,7 +34,7 @@
     update_cache: true
   when: apt_extra_sources_list is changed or apt_cleaned_files is changed
 
-- name: System APT | Установка базового набора пакетов
+- name: System APT | Установка дополнительного набора пакетов
   ansible.builtin.apt:
     name: "{{ apt_extra_packages }}"
     state: present

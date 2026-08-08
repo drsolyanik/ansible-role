@@ -97,6 +97,33 @@ zabbix_agent_extra_groups:
 zabbix_agent_extra_templates:
   - "Custom SSL certificates Monitoring"
   - "Zabbix server health"
+
+apt_extra_repositories:
+  zabbix:
+    gpg_url: "https://repo.zabbix.com/zabbix-official-repo.key"
+    gpg_name: "zabbix.gpg"
+    sources:
+      - uris: ["https://repo.zabbix.com/zabbix/7.0/debian"]
+        suites: ["bookworm"]
+        components: ["main"]
+        types: ["deb"]
+        options:
+          Architectures: ["amd64"]
+          Languages: ["ru", "en"]
+
+  mysql:
+    gpg_url: "http://repo.mysql.com/RPM-GPG-KEY-mysql-2025"
+    gpg_name: "mysql-apt-config.gpg"
+    sources:
+      - uris: ["http://repo.mysql.com/apt/debian/"]
+        suites: ["bookworm"]
+        components: ["mysql-apt-config", "mysql-8.4-lts", "mysql-tools", "mysql-tools-preview"]
+        types: ["deb"]
+
+      - uris: ["http://repo.mysql.com/apt/debian/"]
+        suites: ["bookworm"]
+        components: ["mysql-8.4-lts"]
+        types: ["deb-src"]
 ```
 
 ## **Сценарии промышленного запуска**

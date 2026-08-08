@@ -15,7 +15,7 @@ galaxy_info:
         - "1.8"
     - name: Debian
       versions:
-        - "12"
+        - "bookworm"
 
   galaxy_tags:
     - monitoring
@@ -29,6 +29,6 @@ galaxy_info:
 
 dependencies: []
 
+# requirements.yml
 collections:
-  - name: community.zabbix
-    version: "4.1.1"
+  - community.zabbix

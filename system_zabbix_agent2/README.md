@@ -87,6 +87,7 @@ zabbix_agent_user_parameters_custom:
 zabbix_agent_allow_key_custom:
   - "cert.ssl.discovery"
   - "cert.ssl.get[*]"
+  - "zabbix[*]"
 
 # Расширение групп и шаблонов в Zabbix API
 zabbix_agent_extra_groups:
@@ -96,6 +97,33 @@ zabbix_agent_extra_groups:
 zabbix_agent_extra_templates:
   - "Custom SSL certificates Monitoring"
   - "Zabbix server health"
+
+apt_extra_repositories:
+  zabbix:
+    gpg_url: "https://repo.zabbix.com/zabbix-official-repo.key"
+    gpg_name: "zabbix.gpg"
+    sources:
+      - uris: ["https://repo.zabbix.com/zabbix/7.0/debian"]
+        suites: ["bookworm"]
+        components: ["main"]
+        types: ["deb"]
+        options:
+          Architectures: ["amd64"]
+          Languages: ["ru", "en"]
+
+  mysql:
+    gpg_url: "http://repo.mysql.com/RPM-GPG-KEY-mysql-2025"
+    gpg_name: "mysql-apt-config.gpg"
+    sources:
+      - uris: ["http://repo.mysql.com/apt/debian/"]
+        suites: ["bookworm"]
+        components: ["mysql-apt-config", "mysql-8.4-lts", "mysql-tools", "mysql-tools-preview"]
+        types: ["deb"]
+
+      - uris: ["http://repo.mysql.com/apt/debian/"]
+        suites: ["bookworm"]
+        components: ["mysql-8.4-lts"]
+        types: ["deb-src"]
 ```
 
 ## **Сценарии промышленного запуска**
@@ -125,20 +153,3 @@ zabbix_agent_extra_templates:
     ```
     ansible-playbook site.yml -t zabbix_agent -l "sec_servers" -e "zabbix_agent_regenerate_psk=true"
     ```
-    
-
-## **Правовой статус, участие ИИ и Лицензия**
-
-**Авторские права и статус разработки**
-
-- **Автор разработки:** Соляник Дмитрий Романович.
-    
-- **Правовой статус:** Данная роль разработана автором лично, во внерабочее время, на собственном оборудовании, вне рамок трудовых обязанностей и без использования служебной информации или ресурсов каких-либо работодателей. Разработка является полностью независимой личной интеллектуальной собственностью автора.
-    
-**Раскрытие информации об использовании ИИ**
-
-- В процессе проектирования, оптимизации проверок, рефакторинга кода, написания Jinja2-шаблонов и составления технической документации к данной роли в качестве инженерного и архитектурного соавтора привлекались инструменты искусственного интеллекта.
-    
-**Лицензирование**
-
-- Проект распространяется под свободной лицензией **MIT**. Код предоставляется по принципу AS IS, без каких-либо гарантий. Любое физическое или юридическое лицо имеет право свободно использовать, копировать, модифицировать, объединять, публиковать и распространять данную роль как в некоммерческих, так и в коммерческих целях.

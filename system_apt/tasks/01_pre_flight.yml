@@ -1,0 +1,70 @@
+---
+- name: Pre-flight | Проверка поддерживаемой операционной системы
+  ansible.builtin.assert:
+    that:
+      - (ansible_facts['os_family'] in ['Debian', 'Astra Linux']) or
+        (ansible_facts['distribution'] in ['Debian', 'Astra Linux'])
+    fail_msg: >-
+      Ошибка: Роль не может быть выполнена на этом сервере!
+      Текущая ОС: {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}).
+      Поддерживаемые дистрибутивы: Debian и  Astra Linux.
+
+- name: Pre-flight | Определение базовых репозиториев для текущей ОС
+  ansible.builtin.set_fact:
+    apt_default_repositories: "{{ apt_default_repositories_map[apt_os_key_version] | default(apt_default_repositories_map[apt_os_key_major]) | default({}) }}"
+
+- name: Pre-flight | Объединение базовых и расширенных репозиториев
+  ansible.builtin.set_fact:
+    apt_combined_repositories: "{{ apt_default_repositories | combine(apt_extra_repositories | default({}), recursive=True) }}"
+
+- name: Pre-flight | Проверка наличия конфигурации для текущей ОС
+  ansible.builtin.assert:
+    that: 
+      - apt_combined_repositories is defined
+      - apt_combined_repositories | length > 0
+    fail_msg: >-
+      [CRITICAL] Репозитории для ОС {{ ansible_facts.distribution }} {{ ansible_facts.distribution_version }}
+      (ключ: {{ apt_os_key_version }}) не найдены в apt_default_repositories_map!
+
+- name: Pre-flight | Валидация конфликтующих опций безопасности APT
+  ansible.builtin.assert:
+    that:
+      - not (has_gpg and is_trusted)
+      - not (is_trusted and is_insecure)
+      - not (has_gpg and is_insecure)
+    fail_msg: >-
+      [SECURITY CONFLICT] В репозитории '{{ item.0.key }}' (источник: {{ item.1.uris | join(', ') }}) обнаружена противоречивая конфигурация:
+      {% if has_gpg and is_trusted %}
+      - Заданы GPG-ключ (gpg_name/gpg_url/Signed-By) и 'Trusted: true' (Trusted отключает проверку подписей).
+      {% endif %}
+      {% if is_trusted and is_insecure %}
+      - Одновременно заданы 'Trusted: true' и 'Allow-Insecure: true' (взаимно исключающие параметры APT).
+      {% endif %}
+      {% if has_gpg and is_insecure %}
+      - Задан GPG-ключ и 'Allow-Insecure: true' (наличие ключа исключает небезопасный режим).
+      {% endif %}
+  vars:
+    opts: "{{ item.1.options | default({}) }}"
+    has_gpg: >-
+      {{
+        (item.0.value.gpg_url | default('') | length > 0) or
+        (item.0.value.gpg_name | default('') | length > 0)
+      }}
+    is_trusted: "{{ (opts['Trusted'] | default(false) | bool)  }}"
+    is_insecure: "{{ (opts['Allow-Insecure'] | default(false) | bool) }}"
+  loop: "{{ apt_combined_repositories | dict2items | subelements('value.sources', skip_missing=True) }}"
+
+- name: Pre-flight | Валидация строгого наименования ключей в options
+  ansible.builtin.assert:
+    that:
+      - invalid_keys | length == 0
+    fail_msg: >-
+      [INVALID OPTION KEY] В репозитории '{{ item.0.key }}' (источник: {{ item.1.uris | join(', ') }})
+      обнаружены недопустимые или некорректно оформленные параметры (чувствительно к регистру!): {{ invalid_keys | join(', ') }}.
+      
+      Разрешенные ключи для секции options:
+      {{ apt_allowed_option_keys | join(', ') }}
+  vars:
+    opts_keys: "{{ (item.1.options | default({})).keys() | list }}"
+    invalid_keys: "{{ opts_keys | difference(apt_allowed_option_keys) }}"
+  loop: "{{ apt_combined_repositories | dict2items | subelements('value.sources', skip_missing=True) }}"

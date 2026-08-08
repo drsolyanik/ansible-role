@@ -1,25 +1,105 @@
 ---
+apt_update_cache_valid_time: 3600
+
+# ==============================================================================
+# СПРАВОЧНИК ПОЛЕЙ И ОПЦИЙ РЕПОЗИТОРИЕВ
+# ==============================================================================
+#
+# ПОЛЯ ВЕРХНЕГО УРОВНЯ (Объект репозитория):
+#   <repository_id> (dict, required)  - Уникальный идентификатор репозитория (имя файла .sources).
+#   ├── gpg_url      (string, opt)    - URL для скачивания GPG-ключа.
+#   ├── gpg_name     (string, opt)    - Имя файла ключа в /etc/apt/keyrings/ (например, 'zabbix.gpg').
+#   └── sources      (list, required) - Список блоков источников (stanzas) для DEB822 файла.
+#
+# ПОЛЯ БЛОКА ИСТОЧНИКА (Элементы списка 'sources'):
+#   ├── uris         (list, required) - Список URL/зеркал репозитория.
+#   ├── suites       (list, required) - Дистрибутивы / дистрибутивные ветки (bookworm, 1.8_x86-64).
+#   ├── components   (list, required) - Компоненты репозитория (main, contrib, non-free).
+#   ├── types        (list, opt)      - Типы записей: ['deb'], ['deb-src'] или оба. По умолчанию: ['deb'].
+#   └── options      (dict, opt)      - Дополнительные параметры DEB822.
+#
+# ПОДДЕРЖИВАЕМЫЕ ОПЦИИ В 'options':
+#   ├── Architectures     (list) - Ограничение архитектур: ["amd64", "arm64"].
+#   ├── Languages         (list) - Языковые индексы: ["ru", "en", "none"].
+#   ├── PDiffs            (bool) - Использование патчей индексов вместо полного скачивания (true/false).
+#   ├── By-Hash           (bool) - Скачивание файлов по хэшу (true/false/force).
+#   ├── Check-Valid-Until (bool) - Проверка даты устаревания репозитория (true/false).
+#   ├── Trusted           (bool) - Принудительное доверие БЕЗ проверки GPG-ключа (true/false).
+#   └── Allow-Insecure    (bool) - Разрешить установку из неполных/сломанных источников (true/false).
+#
+#  ЗАПРЕЩЕННЫЕ И КОНФЛИКТУЮЩИЕ КОМБИНАЦИИ (Вызовут ошибку в Pre-flight):
+#   1. gpg_url / gpg_name  +  Trusted: true
+#      Причина: Указание ключа требует проверки подписи, а 'Trusted: true' ее полностью отключает.
+#   2. gpg_url / gpg_name  +  Allow-Insecure: true
+#      Причина: Наличие ключа исключает работу в небезопасном режиме.
+#   3. Trusted: true       +  Allow-Insecure: true
+#      Причина: Взаимоисключающие параметры обхода безопасности APT.
+# ЭТАЛОННЫЙ ПРИМЕР СО ВСЕМИ ВОЗМОЖНЫМИ ПОЛЯМИ И ОПЦИЯМИ:
+# apt_extra_repositories_example:
+#   zabbix-advanced:
+#     gpg_url: "https://repo.zabbix.com/zabbix-official-repo.key"
+#     gpg_name: "zabbix.gpg"
+#     sources:
+#       - uris: ["https://repo.zabbix.com/zabbix/7.0/debian"]
+#         suites: ["bookworm"]
+#         components: ["main"]
+#         types: ["deb", "deb-src"]
+#         options:
+#           Architectures: ["amd64"]
+#           Languages: ["ru", "en"]
+#           PDiffs: false
+#           By-Hash: true
+#           Check-Valid-Until: true
+#           Trusted: false
+#           Allow-Insecure: false
+# ==============================================================================
+
 apt_default_repositories_map:
   Debian_12:
-    - "deb http://ftp.by.debian.org/debian/ bookworm main non-free-firmware"
-    - "deb-src http://ftp.by.debian.org/debian/ bookworm main non-free-firmware"
-    - "deb http://security.debian.org/debian-security bookworm-security main non-free-firmware"
-    - "deb-src http://security.debian.org/debian-security bookworm-security main non-free-firmware"
-    - "deb http://ftp.by.debian.org/debian/ bookworm-updates main non-free-firmware"
-    - "deb-src http://ftp.by.debian.org/debian/ bookworm-updates main non-free-firmware"
+    debian-main:
+      gpg_url: ""          # Не требуется, используются системные ключи
+      gpg_name: ""
+      sources:
+        - uris: ["http://ftp.by.debian.org/debian/"]
+          suites: ["bookworm", "bookworm-updates"]
+          components: ["main", "non-free-firmware"]
+          types: ["deb", "deb-src"]
+
+        - uris: ["http://security.debian.org/debian-security"]
+          suites: ["bookworm-security"]
+          components: ["main", "non-free-firmware"]
+          types: ["deb", "deb-src"]
+
   Astra_Linux_1.8:
-    - "deb https://download.astralinux.ru/astra/stable/1.8_x86-64/repository-extended/ 1.8_x86-64 main contrib non-free non-free-firmware"
-    - "deb https://download.astralinux.ru/astra/stable/1.8_x86-64/repository-main/ 1.8_x86-64 main contrib non-free non-free-firmware"
-  Astra_Linux_1.7:
-    - "deb http://download.astralinux.ru/astra/stable/1.7_x86-64/repository-main/ 1.7_x86-64 main contrib non-free"
+    astra-main:
+      sources:
+        - uris:
+            - "https://download.astralinux.ru/astra/stable/1.8_x86-64/repository-extended/"
+            - "https://download.astralinux.ru/astra/stable/1.8_x86-64/repository-main/"
+          suites: ["1.8_x86-64"]
+          components: ["main", "contrib", "non-free", "non-free-firmware"]
+          types: ["deb"]
 
 apt_os_key_version: "{{ (ansible_facts['distribution'] | replace(' ', '_')) ~ '_' ~ (ansible_facts['distribution_version'].split('_')[0]) }}"
 apt_os_key_major: "{{ (ansible_facts['distribution'] | replace(' ', '_')) ~ '_' ~ (ansible_facts['distribution_major_version']) }}"
+apt_extra_repositories: {}
 
-apt_repositories: "{{ apt_default_repositories_map[apt_os_key_version] | default(apt_default_repositories_map[apt_os_key_major]) | default([]) }}"
+apt_allowed_option_keys:
+  - Architectures
+  - Languages
+  - Targets
+  - PDiffs
+  - By-Hash
+  - Check-Valid-Until
+  - Valid-Until-Min
+  - Valid-Until-Max
+  - Trusted
+  - Allow-Insecure
+  - Allow-Weak
+  - Allow-Downgrade-To-Insecure
+  - Signed-By
 
-apt_update_cache_valid_time: 3600
-apt_base_packages:
+apt_default_packages:
   - ca-certificates
   - curl
   - gnupg
@@ -48,5 +128,3 @@ apt_base_packages:
   - nano
 
 apt_extra_packages: []
-
-apt_packages: "{{ apt_base_packages + (apt_extra_packages | default([])) }}"

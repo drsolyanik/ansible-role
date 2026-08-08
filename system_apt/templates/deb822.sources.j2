@@ -1,0 +1,26 @@
+# {{ ansible_managed }}
+# Managed by Ansible Role: system_apt
+
+{% for source in item.value.sources %}
+Types: {{ source.types | default(['deb']) | join(' ') }}
+URIs: {{ source.uris | join(' ') }}
+Suites: {{ source.suites | join(' ') }}
+Components: {{ source.components | join(' ') }}
+{% if item.value.gpg_name | default('') | length > 0 %}
+Signed-By: /etc/apt/keyrings/{{ item.value.gpg_name }}
+{% endif %}
+{% if source.options is defined and source.options %}
+{% for key, val in source.options.items() %}
+{% if val is boolean %}
+{{ key }}: {{ 'yes' if val else 'no' }}
+{% elif val is iterable and val is not string %}
+{{ key }}: {{ val | join(' ') }}
+{% else %}
+{{ key }}: {{ val }}
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if not loop.last %}
+
+{% endif %}
+{% endfor %}

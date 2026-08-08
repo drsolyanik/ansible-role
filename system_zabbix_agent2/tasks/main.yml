@@ -58,6 +58,7 @@
         - name: Zabbix Agent | Установка zabbix-agent2 из локального deb-файла
           ansible.builtin.apt:
             deb: "/tmp/zabbix-agent2.deb"
+            update_cache: true
             cache_valid_time: 3600
 
       always:

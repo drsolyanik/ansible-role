@@ -106,13 +106,6 @@
       ansible.builtin.command: "grub-reboot '{{ grub_entry_path.stdout | trim }}'"
       changed_when: true
 
-    - name: Kernel Update | Имитировать Kernel panic (вызывается только вручную через --tags)
-      ansible.builtin.command: "mv /boot/initrd.img-{{ new_kernel_version }} /boot/initrd.img-{{ new_kernel_version }}.bak"
-      changed_when: false
-      tags:
-        - never
-        - kernel_panic_test
-
     - name: Kernel Update | Перезагрузить хост для проверки нового ядра
       ansible.builtin.reboot:
         msg: "Ansible инициирует тестовое обновление ядра на версию {{ new_kernel_version }}"

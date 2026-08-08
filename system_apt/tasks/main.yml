@@ -1,32 +1,12 @@
 ---
-- name: Pre-flight | Проверка наличия определенного репозитория для ОС
-  ansible.builtin.assert:
-    that:
-      - apt_repositories is defined
-      - apt_repositories | length > 0
-    fail_msg: >-
-      [CRITICAL FAIL] Для системы {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}
-      не найдены репозитории в apt_default_repositories_map и не заданы в host_vars!
-    success_msg: "Репозитории для {{ apt_os_key_version }} успешно определены."
+- name: System APT | 01. Pre-flight валидация переменных и окружения
+  ansible.builtin.import_tasks: 01_pre_flight.yml
 
-- name: System APT | Настройка конфига /etc/apt/sources.list
-  ansible.builtin.template:
-    src: sources.list.j2
-    dest: /etc/apt/sources.list
-    owner: root
-    group: root
-    mode: '0644'
-    backup: true
-  register: apt_sources_list
+- name: System APT | 02. Настройка базовых репозиториев ОС
+  ansible.builtin.import_tasks: 02_base_repos.yml
 
-- name: System APT | Принудительное обновление кэша apt при изменении sources.list
-  ansible.builtin.apt:
-    update_cache: true
-  when: apt_sources_list is changed
+- name: System APT | 03. Импорт сторонних PGP/GPG ключей
+  ansible.builtin.import_tasks: 03_gpg_keys.yml
 
-- name: System APT | Установка базового набора пакетов
-  ansible.builtin.apt:
-    name: "{{ apt_packages }}"
-    state: present
-    update_cache: true
-    cache_valid_time: "{{ apt_update_cache_valid_time }}"
+- name: System APT | 04. Деплой сторонних репозиториев и установка пакетов
+  ansible.builtin.import_tasks: 04_apt_packages.yml

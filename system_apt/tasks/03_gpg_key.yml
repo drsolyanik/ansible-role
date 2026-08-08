@@ -1,0 +1,50 @@
+---
+- name: System APT | Создание директории для GPG ключей
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: System APT | Блок скачивания GPG ключей репозиториев
+  block:
+  - name: System APT | Скачать GPG ключи репозиториев
+    ansible.builtin.get_url:
+      url: "{{ item.value.gpg_url }}"
+      dest: "/tmp/{{ item.key }}.raw.key"
+      mode: '0644'
+    loop: "{{ apt_combined_repositories | dict2items }}"
+    register: gpg_downloads
+    when:
+        - item.value.gpg_url is defined and item.value.gpg_url | length > 0
+        - item.value.gpg_name is defined and item.value.gpg_name | length > 0
+
+  - name: System APT | Привести GPG ключи к единому бинарному формату (.gpg)
+    ansible.builtin.shell: |
+      set -o pipefail
+      RAW_FILE="/tmp/{{ item.item.key }}.raw.key"
+      DEST_FILE="/etc/apt/keyrings/{{ item.item.value.gpg_name }}"
+
+      if gpg --show-keys "$RAW_FILE" >/dev/null 2>&1; then
+        if head -c 50 "$RAW_FILE" | grep -q 'BEGIN PGP'; then
+          gpg --dearmor --yes -o "$DEST_FILE" "$RAW_FILE"
+        else
+          cp -f "$RAW_FILE" "$DEST_FILE"
+        fi
+        chmod 0644 "$DEST_FILE"
+      fi
+    loop: "{{ gpg_downloads.results }}"
+    when: item.changed is defined and item is changed
+    args:
+      executable: /bin/bash
+
+  always:
+  - name: Удалить временные файлы ключей
+    ansible.builtin.file:
+      path: "/tmp/{{ item.key }}.raw.key"
+      state: absent
+    loop: "{{ apt_combined_repositories | dict2items }}"
+    when:
+      - item.value.gpg_url is defined and item.value.gpg_url | length > 0
+      - item.value.gpg_name is defined and item.value.gpg_name | length > 0

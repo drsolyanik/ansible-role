@@ -1,0 +1,33 @@
+---
+- name: System APT | Очистка старого /etc/apt/sources.list
+  ansible.builtin.copy:
+    content: |
+      # {{ ansible_managed }}
+      # Main repos configured in /etc/apt/sources.list.d/
+    dest: /etc/apt/sources.list
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+
+- name: System APT | Настройка файлов репозиториев в sources.list.d
+  ansible.builtin.template:
+    src: deb822.sources.j2
+    dest: "/etc/apt/sources.list.d/{{ item.key }}.sources"
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ apt_default_repositories | dict2items }}"
+  register: apt_default_sources_list
+
+- name: System APT | Принудительное обновление кэша APT при изменении конфигураций
+  ansible.builtin.apt:
+    update_cache: true
+  when: apt_default_sources_list is changed
+
+- name: System APT | Установка базового набора пакетов
+  ansible.builtin.apt:
+    name: "{{ apt_default_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: "{{ apt_update_cache_valid_time }}"

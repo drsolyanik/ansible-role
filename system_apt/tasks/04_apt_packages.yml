@@ -1,0 +1,43 @@
+---
+- name: System APT | Настройка файлов репозиториев в sources.list.d
+  ansible.builtin.template:
+    src: deb822.sources.j2
+    dest: "/etc/apt/sources.list.d/{{ item.key }}.sources"
+    owner: root
+    group: root
+    mode: '0644'
+  loop: "{{ apt_extra_repositories | dict2items }}"
+  register: apt_extra_sources_list
+
+- name: System APT | Поиск существующих .sources файлов в sources.list.d
+  ansible.builtin.find:
+    paths: /etc/apt/sources.list.d
+    patterns: "*.sources"
+  register: active_extra_files
+
+- name: System APT | Очистка устаревших конфигов из sources.list.d
+  ansible.builtin.file:
+    path: "/etc/apt/sources.list.d/{{ item }}"
+    state: absent
+  loop: >-
+    {{
+      active_extra_files.files
+      | map(attribute='path')
+      | map('basename')
+      | reject('in', (apt_combined_repositories.keys() | map('regex_replace', '$', '.sources') | list))
+      | list
+    }}
+  register: apt_cleaned_files
+
+- name: System APT | Принудительное обновление кэша APT при изменении конфигураций
+  ansible.builtin.apt:
+    update_cache: true
+  when: apt_extra_sources_list is changed or apt_cleaned_files is changed
+
+- name: System APT | Установка базового набора пакетов
+  ansible.builtin.apt:
+    name: "{{ apt_extra_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: "{{ apt_update_cache_valid_time }}"
+  when: apt_extra_packages | length > 0

@@ -2,8 +2,8 @@
 # ==========================================
 # 1. ZABBIX SERVER & API (Подключение и авторегистрация)
 # ==========================================
-zabbix_server_port: 80
-zabbix_server_use_ssl: false
+zabbix_server_port: 80 # 443
+zabbix_server_use_ssl: false # true 
 zabbix_server_validate_certs: false
 zabbix_server_url_path: "zabbix"
 

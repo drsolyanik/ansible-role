@@ -1,0 +1,42 @@
+---
+- name: Pre-flight | Проверка поддерживаемой операционной системы
+  ansible.builtin.assert:
+    that:
+      - (ansible_facts['os_family'] in ['Debian', 'Astra Linux']) or
+        (ansible_facts['distribution'] in ['Debian', 'Astra Linux'])
+    fail_msg: >-
+      Ошибка: Роль не может быть выполнена на этом сервере!
+      Текущая ОС: {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}).
+      Поддерживаемые дистрибутивы: Debian, Astra Linux.
+    success_msg: "ОС {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}) поддерживается роли."
+
+- name: Pre-flight | Проверка доступности активного Zabbix сервера
+  ansible.builtin.wait_for:
+    host: "{{ zabbix_agent_server_active.split(',')[0] | trim }}"
+    port: 10051
+    state: started
+    timeout: 5
+  register: port_check
+  ignore_errors: true
+  when: zabbix_agent_server_active | default('') | length > 0
+
+- name: Pre-flight | Валидация статуса порта 10051 для Zabbix сервера
+  ansible.builtin.assert:
+    that:
+      - not port_check.failed
+    fail_msg: "[NETWORK ERROR]: Порт 10051 Zabbix сервера недоступен! (Таймаут {{ port_check.elapsed }}с)"
+
+- name: Pre-flight | Проверка доступности веб-сервиса Zabbix
+  ansible.builtin.uri:
+    url: "{{ 'https' if zabbix_server_use_ssl else 'http' }}://{{ zabbix_server_name }}:{{ zabbix_server_port }}/{{ zabbix_server_url_path }}"
+    status_code: 200
+    timeout: 5
+  register: http_check
+  delegate_to: localhost
+  ignore_errors: true
+
+- name: Pre-flight | Валидация статуса порта {{ zabbix_server_port }} для Zabbix сервера
+  ansible.builtin.assert:
+    that:
+      - not http_check.failed
+    fail_msg: "[NETWORK ERROR]: Порт {{ zabbix_server_port }} на Zabbix сервере недоступен!"

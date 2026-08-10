@@ -1,0 +1,12 @@
+- name: Zabbix Agent Cleanup | Остановка и отключение старого zabbix-agent
+  ansible.builtin.systemd:
+    name: zabbix-agent
+    state: stopped
+    enabled: false
+  failed_when: false
+
+- name: Zabbix Agent Cleanup | Удаление старого пакета zabbix-agent
+  ansible.builtin.apt:
+    name: zabbix-agent
+    state: absent
+    purge: true

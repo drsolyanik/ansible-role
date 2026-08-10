@@ -1,0 +1,44 @@
+- name: Zabbix Agent Conifg | Развертывание мониторинговых скриптов
+  ansible.builtin.copy:
+    src: "{{ item.file }}"
+    dest: /usr/local/bin/{{ item.file }}
+    owner: root
+    group: root
+    mode: '0750'
+  loop:
+    - { file: 'zbx_discovery_services.sh' }
+    - { file: 'service_check.sh' }
+
+- name: Zabbix Agent Conifg | Настройка прав Sudoers
+  ansible.builtin.template:
+    src: sudoers_zabbix.j2
+    dest: /etc/sudoers.d/zabbix_custom
+    owner: root
+    group: root
+    mode: '0440'
+    validate: /usr/sbin/visudo -cf %s
+
+- name: Zabbix Agent Conifg | Настройка конфигурации zabbix_agent2.conf
+  ansible.builtin.template:
+    src: "zabbix_agent2.conf.j2"
+    dest: "/etc/zabbix/zabbix_agent2.conf"
+    owner: root
+    group: zabbix
+    mode: '0640'
+    validate: "/usr/sbin/zabbix_agent2 -c %s -t system.uptime"
+  notify: Restart zabbix-agent2
+
+- name: Zabbix Agent Conifg | Обеспечиваем запуск и автозагрузку сервиса zabbix-agent2
+  ansible.builtin.systemd:
+    name: zabbix-agent2
+    enabled: true
+    state: started
+
+- name: Zabbix Agent Healthcheck | Проверка отдачи метрики
+  ansible.builtin.command: >
+    /usr/sbin/zabbix_agent2 -c /etc/zabbix/zabbix_agent2.conf -t system.uptime
+  changed_when: false
+  register: agent_health
+  retries: 3
+  delay: 3
+  until: agent_health.rc == 0

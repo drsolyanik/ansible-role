@@ -1,0 +1,28 @@
+- name: Zabbix Agent TLS PSK | Проверка наличия PSK-файла
+  ansible.builtin.stat:
+    path: "{{ zabbix_agent_tls_psk_file }}"
+  register: zabbix_psk_file_stat
+
+- name: Zabbix Agent TLS PSK | Генерация PSK-ключа
+  ansible.builtin.shell:
+    cmd: openssl rand -hex 32 > {{ zabbix_agent_tls_psk_file }}
+  when: not zabbix_psk_file_stat.stat.exists or (zabbix_agent_regenerate_psk | default(false) | bool)
+  notify: Restart zabbix-agent2
+
+- name: Zabbix Agent TLS PSK | Настройка прав доступа на PSK-файл
+  ansible.builtin.file:
+    path: "{{ zabbix_agent_tls_psk_file }}"
+    owner: root
+    group: zabbix
+    mode: '0640'
+
+- name: Zabbix Agent TLS PSK | Считывание PSK-ключа для передачи в Zabbix API
+  ansible.builtin.slurp:
+    src: "{{ zabbix_agent_tls_psk_file }}"
+  register: zabbix_psk_slurp
+  no_log: true
+
+- name: Zabbix Agent TLS PSK | Сохранение значение ключа в переменную
+  ansible.builtin.set_fact:
+    zabbix_psk_secret_value: "{{ zabbix_psk_slurp['content'] | b64decode | trim }}"
+  no_log: true

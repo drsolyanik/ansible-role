@@ -6,6 +6,7 @@ zabbix_server_port: 80 # 443
 zabbix_server_use_ssl: false # true 
 zabbix_server_validate_certs: false
 zabbix_server_url_path: "zabbix"
+zabbix_server_name: "zabbix.sdr.lan" # Ваш zabbix server
 
 zabbix_agent_host_groups:
   - "Linux servers"
@@ -20,8 +21,9 @@ zabbix_agent_host_metadata: "Linux_servers"
 # ==========================================
 zabbix_agent_hostname: "{{ ansible_facts['hostname'] }}"
 zabbix_agent_server: "10.0.2.13"
-zabbix_agent_server_active: "10.0.2.13"
+zabbix_agent_server_active: "10.0.2.13" # Выключить для DMZ серверов
 zabbix_agent_listen_port: 10050
+zabbix_agent_package_state: "present"
 
 # ==========================================
 # 3. БЕЗОПАСНОСТЬ И ШИФРОВАНИЕ (TLS PSK)

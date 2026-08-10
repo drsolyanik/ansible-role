@@ -1,0 +1,26 @@
+- name: Zabbix Agent Debian | Установка zabbix-agent2 на Debian
+  block:
+    - name: Zabbix Agent | Копирование пакета zabbix-agent2 на целевой сервер
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "/tmp/zabbix-agent2.deb"
+        owner: root
+        group: root
+        mode: '0644'
+      with_first_found:
+        - files:
+            - "zabbix-agent2_{{ ansible_facts['distribution'] }}_{{ ansible_facts['distribution_major_version'] }}.deb"
+            - "zabbix-agent2_{{ ansible_facts['distribution'] }}.deb"
+            - "zabbix-agent2.deb"
+
+    - name: Zabbix Agent | Установка zabbix-agent2 из локального deb-файла
+      ansible.builtin.apt:
+        deb: "/tmp/zabbix-agent2.deb"
+        update_cache: true
+        cache_valid_time: 3600
+
+  always:
+    - name: Zabbix Agent | Удаление временного deb-пакета
+      ansible.builtin.file:
+        path: "/tmp/zabbix-agent2.deb"
+        state: absent

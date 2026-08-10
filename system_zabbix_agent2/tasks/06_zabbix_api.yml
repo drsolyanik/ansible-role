@@ -1,0 +1,28 @@
+- name: Zabbix API | Регистрация хоста на Zabbix Server-е
+  vars:
+    ansible_network_os: community.zabbix.zabbix
+    ansible_connection: httpapi
+    ansible_httpapi_port: "{{ zabbix_server_port }}"
+    ansible_httpapi_use_ssl: "{{ zabbix_server_use_ssl }}"
+    ansible_httpapi_validate_certs: "{{ zabbix_server_validate_certs }}"
+    ansible_zabbix_url_path: "{{ zabbix_server_url_path }}"
+    ansible_zabbix_auth_key: "{{ vault_zabbix_server_api_token }}"
+  delegate_to: zabbix.sdr.lan
+  become: false
+  no_log: true
+  community.zabbix.zabbix_host:
+    host_name: "{{ (zabbix_agent_hostname | default(ansible_facts['hostname'])) }}"
+    visible_name: "{{ (zabbix_agent_hostname | default(ansible_facts['hostname'])) }}"
+    host_groups: "{{ (zabbix_agent_host_groups | default(['Linux servers'])) | union(zabbix_agent_extra_groups | default([])) }}"
+    link_templates: "{{ (zabbix_agent_link_templates | default(['Custom Linux by Zabbix agent'])) | union(zabbix_agent_extra_templates | default([])) }}"
+    interfaces:
+      - type: 1
+        main: 1
+        useip: 1
+        ip: "{{ ansible_default_ipv4.address }}"
+        dns: ""
+        port: "10050"
+    tls_connect: "{{ 2 if (zabbix_agent_tls_enable | default(true) | bool) else 1 }}"
+    tls_accept: "{{ 2 if (zabbix_agent_tls_enable | default(true) | bool) else 1 }}"
+    tls_psk_identity: "{{ zabbix_agent_tls_psk_identity if (zabbix_agent_tls_enable | default(true) | bool) else omit }}"
+    tls_psk: "{{ zabbix_psk_secret_value if (zabbix_agent_tls_enable | default(true) | bool) else omit }}"

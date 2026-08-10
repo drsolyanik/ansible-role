@@ -1,0 +1,6 @@
+- name: Zabbix Agent Astra Linux | Установка zabbix-agent2 на Astra Linux
+  ansible.builtin.apt:
+    name: zabbix-agent2
+    state: "{{ zabbix_agent_package_state }}"
+    update_cache: true
+    cache_valid_time: 3600

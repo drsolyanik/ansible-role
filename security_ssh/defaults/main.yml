@@ -57,6 +57,9 @@ ssh_use_pam: "yes"
 ssh_max_auth_tries: 3
 ssh_strict_modes: "yes"
 
+ssh_use_dns: "no"
+ssh_login_grace_time: "60"
+
 ssh_allow_users: []
 ssh_allow_groups: []
 
@@ -78,7 +81,6 @@ ssh_permit_tty: "yes"
 ssh_permit_user_environment: "no"
 ssh_compression: "no"
 ssh_tcp_keep_alive: "no"
-ssh_x11_forwarding: "no"
 
 # ==========================================
 # 6. GSSAPI Configuration
@@ -92,7 +94,7 @@ ssh_gssapi_kex_algorithms:
 # 7. Logging & Environment
 # ==========================================
 ssh_syslog_facility: "AUTH"
-ssh_log_level: "INFO"                      # INFO / VERBOSE / DEBUG / QUIET
+ssh_log_level: "{{ 'VERBOSE' if ssh_bastion_server else 'INFO' }}"                     # INFO / VERBOSE / DEBUG / QUIET
 ssh_print_motd: "no"
 ssh_print_last_log: "yes"
 ssh_accept_env: "LANG LC_*"

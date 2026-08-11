@@ -36,6 +36,9 @@ UsePAM {{ ssh_use_pam }}
 MaxAuthTries {{ ssh_max_auth_tries }}
 StrictModes {{ ssh_strict_modes }}
 
+UseDNS {{ ssh_use_dns }}
+LoginGraceTime {{ ssh_login_grace_time }}
+
 {% if ssh_allow_users is defined and ssh_allow_users | length > 0 %}
 AllowUsers {{ ssh_allow_users | join(' ') }}
 {% endif %}
@@ -56,7 +59,7 @@ MaxStartups {{ ssh_max_startups }}
 # ------------------------------------------------------------------------------
 AllowAgentForwarding {{ ssh_allow_agent_forwarding }}
 AllowTcpForwarding {{ ssh_allow_tcp_forwarding }}
-X11Forwarding {{ ssh_x11_forwarding }}
+X11Forwarding {{ ssh_allow_x11_forwarding }}
 PermitTTY {{ ssh_permit_tty }}
 PermitUserEnvironment {{ ssh_permit_user_environment }}
 Compression {{ ssh_compression }}

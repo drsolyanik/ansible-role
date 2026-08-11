@@ -1,0 +1,5 @@
+- name: Security SSH | 01. Pre-flight параметров конфигурации SSH
+  ansible.builtin.import_tasks: 01_pre_flight.yml
+
+- name: Security SSH | 02. Настройка конфигурации SSH
+  ansible.builtin.import_tasks: 02_configure.yml

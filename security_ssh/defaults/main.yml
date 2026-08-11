@@ -1,0 +1,110 @@
+---
+ssh_service_name: "ssh"
+# ==========================================
+# 1. Network & Socket Settings
+# ==========================================
+ssh_port: 22
+ssh_address_family: "any"                  # inet, inet6 или any
+ssh_listen_addresses:
+  - "0.0.0.0"
+
+ssh_host_keys:
+  - "/etc/ssh/ssh_host_ed25519_key"
+  - "/etc/ssh/ssh_host_rsa_key"
+
+# Флаги типов серверов (переопределяются в group_vars или host_vars)
+ssh_domain_server: false                   # Включает Kerberos/GSSAPI для доменных серверов
+ssh_bastion_server: false                  # Включает жесткие ограничения для Bastion/tlog
+
+# ==========================================
+# 2. Cryptographic Hardening
+# ==========================================
+ssh_kex_algorithms:
+  - "curve25519-sha256"
+  - "curve25519-sha256@libssh.org"
+  - "diffie-hellman-group16-sha512"
+  - "diffie-hellman-group18-sha512"
+  - "diffie-hellman-group14-sha256"
+
+ssh_ciphers:
+  - "chacha20-poly1305@openssh.com"
+  - "aes256-gcm@openssh.com"
+  - "aes128-gcm@openssh.com"
+  - "aes256-ctr"
+  - "aes192-ctr"
+  - "aes128-ctr"
+
+ssh_macs:
+  - "hmac-sha2-512-etm@openssh.com"
+  - "hmac-sha2-256-etm@openssh.com"
+  - "umac-128-etm@openssh.com"
+
+ssh_host_key_algorithms:
+  - "ssh-ed25519"
+  - "ssh-ed25519-cert-v01@openssh.com"
+  - "rsa-sha2-512"
+  - "rsa-sha2-256"
+
+# ==========================================
+# 3. Authentication & Access Control
+# ==========================================
+ssh_permit_root_login: "no"
+ssh_pubkey_authentication: "yes"
+ssh_password_authentication: "yes"
+ssh_permit_empty_passwords: "no"
+ssh_kbd_interactive_auth: "no"
+ssh_use_pam: "yes"
+ssh_max_auth_tries: 3
+ssh_strict_modes: "yes"
+
+ssh_allow_users: []
+ssh_allow_groups: []
+
+# ==========================================
+# 4. Session Management & Timeout Rules
+# ==========================================
+ssh_client_alive_interval: 300             # Проверка каждые 5 минут
+ssh_client_alive_count_max: 2              # 2 пропущенный ответ = разрыв (итого max 10 мин бездействия)
+ssh_max_sessions: "{{ 1 if ssh_bastion_server else 5 }}"
+ssh_max_startups: "{{ '20:30:50' if ssh_bastion_server else '10:30:100' }}"
+
+# ==========================================
+# 5. Security & Traffic Restrictions
+# ==========================================
+ssh_allow_agent_forwarding: "no"
+ssh_allow_tcp_forwarding: "no"
+ssh_allow_x11_forwarding: "no"       
+ssh_permit_tty: "yes"
+ssh_permit_user_environment: "no"
+ssh_compression: "no"
+ssh_tcp_keep_alive: "no"
+ssh_x11_forwarding: "no"
+
+# ==========================================
+# 6. GSSAPI Configuration
+# ==========================================
+ssh_gssapi_kex_algorithms:
+  - "gss-curve25519-sha256-*"
+  - "gss-group16-sha512-*"
+  - "gss-group14-sha256-*"
+
+# ==========================================
+# 7. Logging & Environment
+# ==========================================
+ssh_syslog_facility: "AUTH"
+ssh_log_level: "INFO"                      # INFO / VERBOSE / DEBUG / QUIET
+ssh_print_motd: "no"
+ssh_print_last_log: "yes"
+ssh_accept_env: "LANG LC_*"
+
+# ==========================================
+# 8. Subsystem Configuration
+# ==========================================
+ssh_sftp_subsystem: "internal-sftp"        # Встроенный модуль SFTP
+ssh_include_sshd_config_d: false           # Использовать/игнорировать файлы из /etc/ssh/sshd_config.d/
+ssh_enable_banner: true
+ssh_banner_path: "/etc/ssh/sshd_banner"
+ssh_company_name: "Название Вашей Компании" # Подставляется в Jinja2 шаблон баннера
+ssh_security_contacts:
+  - "email: security@company.com"
+  - "тел: 8 (800) 555-35-35 (Служба ИБ)"

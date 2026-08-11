@@ -1,0 +1,32 @@
+===============================================================================
+                                ВНИМАНИЕ! / WARNING!
+===============================================================================
+Данная компьютерная система является собственностью {{ ssh_company_name }}.
+Несанкционированный доступ, попытки доступа или несанкционированное изменение
+данных строго запрещены и преследуются по закону в соответствии с Уголовным
+кодексом РФ (ст. 272, 273, 274 УК РФ).
+
+Вся активность в данной системе регистрируется и контролируется. Использование
+этой системы означает ваше согласие на аудит и мониторинг. Если вы не являетесь
+авторизованным пользователем, НЕМЕДЛЕННО ОТКЛЮЧИТЕСЬ.
+
+Если вам удалось получить несанкционированный доступ или обнаружить уязвимость, 
+просим незамедлительно сообщить ответственному лицу:
+{% for contact in ssh_security_contacts %}
+ - {{ contact }}
+{% endfor %}
+===============================================================================
+This computer system is the property of {{ ssh_company_name }}.
+Unauthorized access, access attempts, or unauthorized data modification
+are strictly prohibited and subject to criminal prosecution.
+
+All activities on this system are logged and monitored. By continuing to use
+this system, you expressly consent to such monitoring. If you are not an
+authorized user, DISCONNECT IMMEDIATELY.
+
+If you have gained unauthorized access or discovered a vulnerability, please
+immediately report it to:
+{% for contact in ssh_security_contacts %}
+ - {{ contact }}
+{% endfor %}
+===============================================================================

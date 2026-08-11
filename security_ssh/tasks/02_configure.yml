@@ -1,0 +1,27 @@
+- name: Security SSH | Настройка sshd_config
+  ansible.builtin.template:
+    src: sshd_config.j2
+    dest: /etc/ssh/sshd_config
+    owner: root
+    group: root
+    mode: '0600'
+    validate: /usr/sbin/sshd -t -f %s
+    backup: true
+  notify: Restart SSH service
+
+- name: Security SSH | Настройка sshd_banner
+  ansible.builtin.template:
+    src: sshd_banner.j2
+    dest: /etc/ssh/sshd_banner
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  when: ssh_enable_banner | default(false) | bool
+  notify: Restart SSH service
+
+- name: Security SSH | Обеспечиваем запуск и автозагрузку сервиса ssh
+  ansible.builtin.service:
+    name: "{{ ssh_service_name | default('ssh') }}"
+    enabled: true
+    state: started

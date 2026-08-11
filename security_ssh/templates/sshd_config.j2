@@ -1,0 +1,102 @@
+# {{ ansible_managed }}
+# Managed by Ansible Role: security_ssh
+
+# See sshd_config(5) for more information.
+
+# ------------------------------------------------------------------------------
+# 1. Network & Socket Settings
+# ------------------------------------------------------------------------------
+Port {{ ssh_port }}
+AddressFamily {{ ssh_address_family }}
+{% for address in ssh_listen_addresses %}
+ListenAddress {{ address }}
+{% endfor %}
+
+{% for host_key in ssh_host_keys %}
+HostKey {{ host_key }}
+{% endfor %}
+
+# ------------------------------------------------------------------------------
+# 2. Cryptographic Hardening
+# ------------------------------------------------------------------------------
+KexAlgorithms {{ ssh_kex_algorithms | join(',') }}
+Ciphers {{ ssh_ciphers | join(',') }}
+MACs {{ ssh_macs | join(',') }}
+HostKeyAlgorithms {{ ssh_host_key_algorithms | join(',') }}
+
+# ------------------------------------------------------------------------------
+# 3. Authentication & Access Control
+# ------------------------------------------------------------------------------
+PermitRootLogin {{ ssh_permit_root_login }}
+PubkeyAuthentication {{ ssh_pubkey_authentication }}
+PasswordAuthentication {{ ssh_password_authentication }}
+PermitEmptyPasswords {{ ssh_permit_empty_passwords }}
+KbdInteractiveAuthentication {{ ssh_kbd_interactive_auth }}
+UsePAM {{ ssh_use_pam }}
+MaxAuthTries {{ ssh_max_auth_tries }}
+StrictModes {{ ssh_strict_modes }}
+
+{% if ssh_allow_users is defined and ssh_allow_users | length > 0 %}
+AllowUsers {{ ssh_allow_users | join(' ') }}
+{% endif %}
+{% if ssh_allow_groups is defined and ssh_allow_groups | length > 0 %}
+AllowGroups {{ ssh_allow_groups | join(' ') }}
+{% endif %}
+
+# ------------------------------------------------------------------------------
+# 4. Session Management & Timeout Rules
+# ------------------------------------------------------------------------------
+ClientAliveInterval {{ ssh_client_alive_interval }}
+ClientAliveCountMax {{ ssh_client_alive_count_max }}
+MaxSessions {{ ssh_max_sessions }}
+MaxStartups {{ ssh_max_startups }}
+
+# ------------------------------------------------------------------------------
+# 5. Security & Traffic Restrictions
+# ------------------------------------------------------------------------------
+AllowAgentForwarding {{ ssh_allow_agent_forwarding }}
+AllowTcpForwarding {{ ssh_allow_tcp_forwarding }}
+X11Forwarding {{ ssh_x11_forwarding }}
+PermitTTY {{ ssh_permit_tty }}
+PermitUserEnvironment {{ ssh_permit_user_environment }}
+Compression {{ ssh_compression }}
+TCPKeepAlive {{ ssh_tcp_keep_alive }}
+
+# ------------------------------------------------------------------------------
+# 6. GSSAPI Configuration
+# ------------------------------------------------------------------------------
+{% if ssh_domain_server | default(false) | bool %}
+# Domain Member GSSAPI Integration
+GSSAPIAuthentication yes
+GSSAPICleanupCredentials yes
+GSSAPIStrictAcceptorCheck yes
+GSSAPIKeyExchange yes
+GSSAPIKexAlgorithms {{ ssh_gssapi_kex_algorithms | join(',') }}
+{% else %}
+# Standard standalone server
+GSSAPIAuthentication no
+GSSAPICleanupCredentials yes
+GSSAPIKeyExchange no
+{% endif %}
+
+# ------------------------------------------------------------------------------
+# 7. Logging & Environment
+# ------------------------------------------------------------------------------
+SyslogFacility {{ ssh_syslog_facility }}
+LogLevel {{ ssh_log_level }}
+PrintMotd {{ ssh_print_motd }}
+PrintLastLog {{ ssh_print_last_log }}
+AcceptEnv {{ ssh_accept_env }}
+
+# ------------------------------------------------------------------------------
+# 8. Subsystem Configuration
+# ------------------------------------------------------------------------------
+Subsystem sftp {{ ssh_sftp_subsystem }}
+{% if ssh_include_sshd_config_d | default(false) | bool %}
+Include /etc/ssh/sshd_config.d/*.conf
+{% endif %}
+{% if ssh_enable_banner | default(false) | bool %}
+Banner {{ ssh_banner_path }}
+{% else %}
+Banner none
+{% endif %}

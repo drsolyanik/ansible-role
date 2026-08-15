@@ -1,0 +1,145 @@
+---
+- name: Pre-flight | Проверка поддерживаемой операционной системы
+  ansible.builtin.assert:
+    that:
+      - (ansible_facts['os_family'] in ['Debian', 'Astra Linux']) or
+        (ansible_facts['distribution'] in ['Debian', 'Astra Linux'])
+    fail_msg: >-
+      Ошибка: Роль не может быть выполнена на этом сервере!
+      Текущая ОС: {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}).
+      Поддерживаемые дистрибутивы: Debian, Astra Linux.
+    success_msg: "ОС {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}) поддерживается роли."
+
+- name: Pre-flight | Предупреждение об отключённом PAM модуле
+  ansible.builtin.debug:
+    msg: "[WARNING]: PAM модуль отключен! Критическая уязвимость! Данная опция подходит только для тестирования!"
+  when: not (pam_ssh_access_deny_all | default(true) | bool)
+
+- name: Pre-flight | Проверка указанных параметров для PAM модуля
+  ansible.builtin.assert:
+    that:
+      - pam_ssh_password_hash in ['yescrypt', 'sha512']
+      - pam_ssh_access_admin | map(attribute='name') | reject('equalto', '') | list | length > 0
+      - pam_ssh_access_admin | map(attribute='origin') | reject('equalto', '') | list | length > 0
+      - pam_ssh_access_file | length > 0 and pam_ssh_access_file is regex('^/')
+      - pam_ssh_password_remember | int > 0
+      - pam_ssh_backup_count | int > 0
+    fail_msg: "[CRITICAL ERROR]: Ошибка в заданных параметрах PAM SSH!"
+
+- name: Pre-flight | Проверка параметров временной блокировки
+  ansible.builtin.assert:
+    that: 
+      - pam_ssh_faillock_deny | int > 0
+      - pam_ssh_faillock_unlock_time | int > 60
+    fail_msg: "[CRITICAL]: Не настроены параметры временной блокировки!"
+  when: pam_ssh_faillock_enable | default(true) | bool
+    
+- name: Pre-flight | Сбор фактов о пакетах
+  ansible.builtin.package_facts:
+    manager: apt
+
+- name: Pre-flight | Проверка обязательных пакетов
+  ansible.builtin.assert:
+    that:
+      - item in ansible_facts.packages
+    fail_msg: "[CRITICAL]: Отсутствует обязательный пакет: {{ item }}"
+  loop: "{{ pam_ssh_required_packages_always }}"
+
+#################################################################
+# ПРОВЕРКИ ДОМЕННЫХ ПАРАМЕТРОВ
+#################################################################
+- name: Pre-flight | Проверка доменных параметров модуля PAM
+  when: pam_ssh_domain_server | default(false) | bool
+  block:
+    - name: Pre-flight | Сбор фактов о службах
+      ansible.builtin.service_facts:
+
+    - name: Pre-flight | Проверка обязательных пакетов SSSD
+      ansible.builtin.assert:
+        that:
+          - item in ansible_facts.packages
+        fail_msg: "[CRITICAL]: Отсутствует обязательный пакет SSSD: {{ item }}"
+      loop: "{{ pam_ssh_required_packages_domain }}"
+
+    - name: Pre-flight | Проверка службы SSSD
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['sssd.service'] is defined
+        fail_msg: "[CRITICAL]: Служба sssd.service не найдена в системе!"
+
+    - name: Pre-flight | Проверка состояния SSSD
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['sssd.service'].state == 'running'
+        fail_msg: "[CRITICAL]: Служба sssd.service не запущена!"
+
+    - name: Pre-flight | Проверка доменного суффикса
+      ansible.builtin.assert:
+        that: 
+          - pam_ssh_domain | length > 0
+          - pam_ssh_domain is regex('^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$')
+        fail_msg: "[CRITICAL]: Невалидный или пустой доменный суффикс!"
+    
+    - name: Pre-flight | DNS-запрос для A записи домена 
+      ansible.builtin.command: "getent ahosts {{ pam_ssh_domain }}"
+      register: _dns_a_records
+      changed_when: false
+      ignore_errors: true
+
+    - name: Pre-flight | Проверка доступности DNS имени
+      ansible.builtin.assert:
+        that:
+          - _dns_a_records.rc == 0
+          - _dns_a_records.stdout | length > 0
+        fail_msg: "[CRITICAL]: Не найдена запись A для доменного сервера {{ pam_ssh_domain }}!"   
+    
+    - name: Pre-flight | Проверка настроек для GSSAPI sudo
+      when: pam_ssh_gssapi_sudo_enable | default(false) | bool
+      block:
+      - name: Pre-flight | Проверка PAM-файлов для GSSAPI sudo
+        ansible.builtin.assert:
+          that: 
+            - pam_ssh_gssapi_sudo_files | length > 0
+          fail_msg: "[CRITICAL]: Не заданы PAM-файлы для GSSAPI sudo!"
+        
+      - name: Pre-flight | Поиск pam_sss_gss.so
+        ansible.builtin.find:
+          paths:
+            - /lib/x86_64-linux-gnu/security
+            - /usr/lib/x86_64-linux-gnu/security
+            - /lib64/security
+            - /usr/lib64/security
+          recurse: false
+          patterns: pam_sss_gss.so
+        register: _pam_sss_gss_files
+
+      - name: Pre-flight | Проверка существования pam_sss_gss.so
+        ansible.builtin.assert:
+          that:
+            - _pam_sss_gss_files.matched > 0
+          fail_msg: "[CRITICAL]: PAM-модуль pam_sss_gss.so не найден!"
+
+#################################################################
+# ПРОВЕРКИ ПАРАМЕТРОВ ДОМАШНЕЙ ДИРЕКТОРИИ
+#################################################################
+- name: Pre-flight | Проверка skel
+  ansible.builtin.stat:
+    path: "{{ pam_ssh_mkhomedir_skel }}"
+  register: _pam_skel_stat
+  when: pam_ssh_mkhomedir_enable | default(true) | bool
+
+- name: Pre-flight | Проверка существования skel
+  ansible.builtin.assert:
+    that:
+      - _pam_skel_stat.stat.exists
+      - _pam_skel_stat.stat.isdir
+    fail_msg: "[CRITICAL]: Директория skel {{ pam_ssh_mkhomedir_skel }} не существует!"
+  when: pam_ssh_mkhomedir_enable | default(true) | bool
+
+- name: Pre-flight | Проверка umask домашней директории
+  ansible.builtin.assert:
+    that:
+      - pam_ssh_mkhomedir_umask is regex('^0[0-7]{3}$')
+      - pam_ssh_mkhomedir_umask in ['0077', '0027']
+    fail_msg: "[CRITICAL]: umask {{ pam_ssh_mkhomedir_umask }} невалидный или слишком открытый!"
+  when: pam_ssh_mkhomedir_enable | default(true) | bool

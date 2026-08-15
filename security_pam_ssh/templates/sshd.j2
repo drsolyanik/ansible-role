@@ -1,0 +1,116 @@
+# {{ ansible_managed }}
+# Managed by Ansible Role: security_pam_ssh
+
+# =======================================================================
+# ЭТАП AUTH (Аутентификация)
+# =======================================================================
+# Проверка на блокировку учетной записи по количеству ошибок ввода
+{% if pam_ssh_faillock_enable | default(false) | bool %}
+auth       required  pam_faillock.so preauth silent deny={{ pam_ssh_faillock_deny }} unlock_time={{ pam_ssh_faillock_unlock_time }}
+{% endif %}
+
+{% if pam_ssh_domain_server | default(false) | bool %}
+# Если пользователь локальный -> прыгаем через 1 строку (к pam_unix), минуя проверку домена.
+# Если пользователь доменный -> игнорируем прыжок и идем к pam_sss
+auth        [success=1 default=ignore]  pam_localuser.so
+
+# Доменная аутентификация через SSSD
+# Если домен подтвердил валидность пароля -> завершаем этап (done).
+# Если пользователя нет в домене (user_unknown) -> передаем управление дальше (ignore).
+# При неверном доменном пароле или просроченном аккаунте -> фиксируем сбой (bad).
+auth        [success=2 new_authtok_reqd=2 user_unknown=ignore default=bad]        pam_sss.so try_first_pass
+{% endif %}
+
+# Локальная аутентификация
+# Если пароль верный -> завершаем этап (done). Локальный администратор авторизован.
+# Если пользователь доменный (user_unknown) -> мягко идем к следующей строке (ignore).
+# Если пароль локального юзера неверный -> фиксируем сбой (bad).
+auth        [success=1 new_authtok_reqd=1 user_unknown=ignore default=bad]        pam_unix.so try_first_pass
+
+#  Финальный отказ
+{% if pam_ssh_faillock_enable | default(false) | bool %}
+auth       required  pam_faillock.so authfail
+auth       sufficient pam_faillock.so authsucc
+{% endif %}
+auth       required    pam_deny.so
+
+# =======================================================================
+# ЭТАП ACCOUNT (Правомерность доступа: Проверка ограничений аккаунта)
+# =======================================================================
+account    required     pam_nologin.so
+# Централизованный корпоративный фильтр хостов и групп
+# Проверяем права на вход по спискам из файла {{ pam_ssh_access_file }}
+account     required      pam_access.so accessfile={{ pam_ssh_access_file }}
+
+{% if pam_ssh_domain_server | default(false) | bool %}
+# Маршрутизация (Разделение локальных и доменных учетных записей)
+# Если пользователь локальный -> прыгаем через 1 строку и идем к pam_unix, минуя проверку домена.
+# Если пользователь доменный -> игнорируем прыжок и идем к pam_sss.
+account [success=1 default=ignore]                      pam_localuser.so
+
+# Доменный контроль учетной записи
+# SSSD проверяет статус аккаунта в домене, сроки действия и принудительную смену пароля.
+# Если аккаунт активен или готов к смене пароля -> успешно завершаем весь этап ACCOUNT (done).
+# Если учетка заблокирована или не найдена в домене -> фиксируем критический сбой (bad).
+account     [success=done new_authtok_reqd=done default=bad]    pam_sss.so
+{% endif %}
+
+# Локальный контроль учетной записи
+# Вызывается только для локальных пользователей. Проверяет /etc/shadow, блокировки и локальное истечение паролей.
+# При успехе или необходимости смены пароля -> успешно завершаем этап ACCOUNT (done).
+# Если учетка заблокирована или не найдена -> фиксируем критический сбой (bad).
+account     [success=done new_authtok_reqd=done default=bad]      pam_unix.so
+
+# Резервный блокировщик
+account requisite                       pam_deny.so
+
+# =======================================================================
+# ЭТАП SESSION (Настройка окружения и системных лимитов)
+# =======================================================================
+session     required      pam_loginuid.so
+session     optional      pam_keyinit.so force revoke
+
+session     optional      pam_motd.so  motd=/run/motd.dynamic
+session     optional      pam_motd.so noupdate
+
+session     required      pam_limits.so
+session     required      pam_env.so
+session     required      pam_env.so user_readenv=1 envfile=/etc/default/locale
+
+session     optional      pam_systemd.so
+
+session     required      pam_unix.so
+{% if pam_ssh_domain_server | default(false) | bool %}
+session     optional      pam_sss.so
+{% endif %}
+
+{% if pam_ssh_mkhomedir_enable | default(false) | bool %}
+# Автоматическое создание домашней директории при первом входе пользователя
+session     optional      pam_mkhomedir.so umask={{ pam_ssh_mkhomedir_umask }} skel={{ pam_ssh_mkhomedir_skel }}
+{% endif %}
+
+session [success=ok ignore=ignore module_unknown=ignore default=bad]        pam_selinux.so open
+
+# =======================================================================
+# ЭТАП PASSWORD (Смена и управление сложностью паролей)
+# =======================================================================
+{% if pam_ssh_domain_server | default(false) | bool %}
+# Локальный вход
+# Если пользователь локальный -> выполняем проверку локальной сложности пароля
+# Если доменный -> перепрыгиваем проверку локальной сложности
+password [success=ignore default=1]                      pam_localuser.so
+{% endif %}
+
+# Контроль сложности локальных паролей
+# Применяет требования к длине, спецсимволам и регистру из /etc/security/pwquality.conf
+password    required      pam_pwquality.so
+
+{% if pam_ssh_domain_server | default(false) | bool %}
+# Изменение пароля в корпоративном домене
+# Если меняется доменный пароль -> транслируем изменения в домен и завершаем этап (done)
+password    [success=done default=ignore]                     pam_sss.so
+{% endif %}
+
+# Изменение локального пароля
+# Если меняется локальный пароль -> хэшируем его современным алгоритмом yescrypt и сохраняем в /etc/shadow
+password    required      pam_unix.so {{ pam_ssh_password_hash }} shadow try_first_pass remember={{ pam_ssh_password_remember }}

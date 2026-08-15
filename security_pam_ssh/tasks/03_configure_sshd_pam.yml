@@ -1,0 +1,28 @@
+---
+- name: Security PAM SSH | Настройка /etc/pam.d/sshd
+  ansible.builtin.template:
+    src: sshd.j2
+    dest: "/etc/pam.d/sshd"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  register: _sshd_pam_result
+
+- name: Security PAM SSH | Очистка старых бэкапов /etc/pam.d/sshd
+  block:
+    - name: Security PAM SSH | Поиск всех бэкапов /etc/pam.d/sshd
+      ansible.builtin.find:
+        paths: "/etc/pam.d"
+        patterns: "sshd.*~"
+      register: _backups_sshd_pam
+
+    - name: Security PAM SSH | Удаление бэкапов старше {{ pam_ssh_backup_count }} последних
+      ansible.builtin.file:
+        path: "{{ backup_item.path }}"
+        state: absent
+      loop: "{{ (_backups_sshd_pam.files | sort(attribute='mtime', reverse=true))[pam_ssh_backup_count|int:] }}"
+      when: _backups_sshd_pam.files | length > pam_ssh_backup_count | int
+      loop_control:
+        loop_var: backup_item
+  when: _sshd_pam_result is changed

@@ -1,0 +1,28 @@
+---
+- name: Security PAM SSH | Настройка {{ pam_ssh_access_file }}
+  ansible.builtin.template:
+    src: access-sshd.conf.j2
+    dest: "{{ pam_ssh_access_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  register: _access_conf_result
+
+- name: Security PAM SSH | Очистка старых бэкапов {{ pam_ssh_access_file }}
+  block:
+    - name: Security PAM SSH | Поиск всех бэкапов {{ pam_ssh_access_file }}
+      ansible.builtin.find:
+        paths: "{{ pam_ssh_access_file | dirname }}"
+        patterns: "{{ pam_ssh_access_file | basename }}.*~"
+      register: _backups_access_conf
+
+    - name: Security PAM SSH | Удаление бэкапов старше {{ pam_ssh_backup_count }} последних
+      ansible.builtin.file:
+        path: "{{ backup_item.path }}"
+        state: absent
+      loop: "{{ (_backups_access_conf.files | sort(attribute='mtime', reverse=true))[pam_ssh_backup_count|int:] }}"
+      when: _backups_access_conf.files | length > pam_ssh_backup_count | int
+      loop_control:
+        loop_var: backup_item
+  when: _access_conf_result is changed

@@ -13,8 +13,9 @@ ssh_host_keys:
   - "/etc/ssh/ssh_host_rsa_key"
 
 # Флаги типов серверов (переопределяются в group_vars или host_vars)
-ssh_domain_server: false                   # Включает Kerberos/GSSAPI для доменных серверов
-ssh_bastion_server: false                  # Включает жесткие ограничения для Bastion/tlog
+domain_joined: false
+ssh_domain_server: "{{ domain_joined | default(false) | bool }}"   # Включает Kerberos/GSSAPI для доменных серверов
+ssh_bastion_server: false                                          # Включает ограничения для Bastion/tlog
 
 # ==========================================
 # 2. Cryptographic Hardening

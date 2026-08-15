@@ -19,12 +19,48 @@
   ansible.builtin.assert:
     that:
       - pam_ssh_password_hash in ['yescrypt', 'sha512']
-      - pam_ssh_access_admin | map(attribute='name') | reject('equalto', '') | list | length > 0
-      - pam_ssh_access_admin | map(attribute='origin') | reject('equalto', '') | list | length > 0
       - pam_ssh_access_file | length > 0 and pam_ssh_access_file is regex('^/')
       - pam_ssh_password_remember | int > 0
       - pam_ssh_backup_count | int > 0
     fail_msg: "[CRITICAL ERROR]: Ошибка в заданных параметрах PAM SSH!"
+
+- name: Определить активные SSH-правила с учетом доменного статуса
+  ansible.builtin.set_fact:
+    _pam_ssh_active_rules: >-
+      {{
+        pam_ssh_rules.values()
+        | selectattr('ssh', 'defined')
+        | selectattr('ssh')
+        | rejectattr('source', 'equalto', 'domain')
+        | list
+        +
+        (
+          pam_ssh_rules.values()
+          | selectattr('ssh', 'defined')
+          | selectattr('ssh')
+          | selectattr('source', 'equalto', 'domain')
+          | list
+          if pam_ssh_domain_server | default(false)
+          else []
+        )
+      }}
+
+- name: Pre-flight | Проверка наличия активных SSH-правил
+  ansible.builtin.assert:
+    that: 
+      - _pam_ssh_active_rules is defined
+      - _pam_ssh_active_rules | length > 0
+    fail_msg: "[CRITICAL ERROR]: Список активных SSH-правил пуст!"
+
+- name: Pre-flight | Проверка активные SSH-правил
+  ansible.builtin.assert:
+    that:
+      - item.identity is regex('^[a-z_][a-z0-9_-]{0,31}$')
+      - item.identity | length > 0
+      - item.type in ['user', 'group']
+      - item.source in ['local', 'domain']
+    fail_msg: "[CRITICAL ERROR]: Ошибка в списке активных SSH-правил!"
+  loop: "{{ _pam_ssh_active_rules }}"
 
 - name: Pre-flight | Проверка параметров временной блокировки
   ansible.builtin.assert:
@@ -51,15 +87,15 @@
 - name: Pre-flight | Проверка доменных параметров модуля PAM
   when: pam_ssh_domain_server | default(false) | bool
   block:
-    - name: Pre-flight | Сбор фактов о службах
-      ansible.builtin.service_facts:
-
     - name: Pre-flight | Проверка обязательных пакетов SSSD
       ansible.builtin.assert:
         that:
           - item in ansible_facts.packages
         fail_msg: "[CRITICAL]: Отсутствует обязательный пакет SSSD: {{ item }}"
       loop: "{{ pam_ssh_required_packages_domain }}"
+
+    - name: Pre-flight | Сбор фактов о службах
+      ansible.builtin.service_facts:
 
     - name: Pre-flight | Проверка службы SSSD
       ansible.builtin.assert:
@@ -72,6 +108,17 @@
         that:
           - ansible_facts.services['sssd.service'].state == 'running'
         fail_msg: "[CRITICAL]: Служба sssd.service не запущена!"
+
+    - name: Pre-flight | Проверка типов доменных SSH-правил
+      ansible.builtin.assert:
+        that:
+          - item.type == 'group'
+        fail_msg: >-
+          [CRITICAL ERROR]: Для доменного SSH-правила
+          "{{ item.identity }}" тип должен быть "group",
+          получено: "{{ item.type }}"
+      loop: "{{ _pam_ssh_active_rules }}"
+      when: item.source == 'domain'
 
     - name: Pre-flight | Проверка доменного суффикса
       ansible.builtin.assert:

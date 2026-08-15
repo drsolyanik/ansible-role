@@ -2,53 +2,24 @@
 # Managed by Ansible Role: security_pam_ssh
 
 # =========================================
-# SSHD ACCESS CONTROL CONFIGURATION 
+# SSHD ACCESS CONTROL CONFIGURATION
 # =========================================
 
-# Аварийный локальный администратор
-{% for entry in pam_ssh_access_admin %}
-# {{ entry.comment | default('Admin access') }}
-+ : {{ entry.name }} : {{ entry.origin }}
-{% endfor %}
-
-{% if not pam_ssh_domain_server | default(false) | bool and pam_ssh_access_local_service_accounts | length > 0 %}
-# Локальные сервисные учетные записи
-{% for entry in pam_ssh_access_local_service_accounts %}
-# {{ entry.comment | default('Service account') }}
-+ : {{ entry.name }} : {{ entry.origin }}
-{% endfor %}
+{% for entry in _pam_ssh_active_rules %}
+{% if entry.ssh %}
+# {{ entry.description }}
+{% if entry.source == "local" %}
+{% if entry.type == "user" %}
++ : {{ entry.identity }} : {{ entry.ssh_origin }}
+{% elif entry.type == "group" %}
++ : ({{ entry.identity }}) : {{ entry.ssh_origin }}
 {% endif %}
-
-{% if pam_ssh_access_local_extra | length > 0 %}
-# Дополнительные локальные записи доступа
-{% for entry in pam_ssh_access_local_extra %}
-# {{ entry.comment | default('Extra entry') }}
-{% if entry.type | default('user') == 'group' %}
-+ : ({{ entry.name }}) : {{ entry.origin }}
-{% else %}
-+ : {{ entry.name }} : {{ entry.origin }}
-{% endif %}
-{% endfor %}
-{% endif %}
-
-{% if pam_ssh_domain_server | default(false) | bool %}
-{% if pam_ssh_access_domain_groups_default | length > 0 %}
-# Основные доменные группы
-{% for entry in pam_ssh_access_domain_groups_default %}
-# {{ entry.comment | default('Domain group') }}
-+ : ({{ entry.name }}@{{ pam_ssh_domain }}) : {{ entry.origin }}
-{% endfor %}
-{% endif %}
-
-{% if pam_ssh_access_domain_groups_extra | length > 0 %}
-# Дополнительные доменные группы
-{% for entry in pam_ssh_access_domain_groups_extra %}
-# {{ entry.comment | default('Extra domain group') }}
-+ : ({{ entry.name }}@{{ pam_ssh_domain }}) : {{ entry.origin }}
-{% endfor %}
+{% elif entry.source == "domain" %}
++ : ({{ entry.identity }}@{{ pam_ssh_domain }}) : {{ entry.ssh_origin }}
 {% endif %}
 {% endif %}
 
+{% endfor %}
 {% if pam_ssh_access_deny_all | default(true) | bool %}
 # Запрет для всех остальных
 - : ALL : ALL

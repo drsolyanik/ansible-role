@@ -2,10 +2,25 @@
 # ==============================================================================
 # ОБЩИЕ НАСТРОЙКИ
 # ==============================================================================
+access_profiles_default: {}
+access_profiles_extra: {}
+pam_ssh_rules: >-
+  {{
+    access_profiles_default
+    | combine(
+        access_profiles_extra,
+        recursive=true
+      )
+  }}
+
 pam_ssh_backup_count: 3
 # Сервер в домене (FreeIPA / AD / SSSD)
-pam_ssh_domain_server: false
-pam_ssh_domain: "sdr.lan"
+domain_joined: false
+pam_ssh_domain_server: "{{ domain_joined | default(false) | bool }}"
+
+domain_suffix: "domain.local"
+pam_ssh_domain: "{{ domain_suffix }}"
+
 pam_ssh_required_packages_domain:
   - sssd
   - libnss-sss
@@ -30,7 +45,7 @@ pam_ssh_mkhomedir_skel: "/etc/skel"
 # ==============================================================================
 # GSSAPI ДЛЯ SUDO
 # ==============================================================================
-pam_ssh_gssapi_sudo_enable: "{{ pam_ssh_domain_server }}"
+pam_ssh_gssapi_sudo_enable: "{{ pam_ssh_domain_server | default(false) | bool }}"
 pam_ssh_gssapi_sudo_files:
   - "/etc/pam.d/sudo"
   - "/etc/pam.d/sudo-i"
@@ -42,52 +57,8 @@ pam_ssh_gssapi_sudo_files:
 # Путь к файлу вынесен из хардкода
 pam_ssh_access_file: "/etc/security/access-sshd.conf"
 
-# Аварийный локальный админ — ВСЕГДА, fallback при отвале домена/сети
-# Формат единообразный: name, origin, comment
-pam_ssh_access_admin:
-  - name: "sa"
-    origin: "ALL"
-    comment: "Локальный аварийный администратор"
-
-# Локальные сервисные учетки — ТОЛЬКО для standalone
-pam_ssh_access_local_service_accounts:
-  - name: "ansible-worker"
-    origin: "10.0.2.20"
-    comment: "Управляющий узел Ansible (только standalone)"
-  - name: "oszi"
-    origin: "10.0.2.19"
-    comment: "Сканер / Сервер ИБ (только standalone)"
-
-# Базовые доменные группы (применяются только при pam_ssh_domain_server=true)
-# Автоматически оборачиваются в () в шаблоне
-pam_ssh_access_domain_groups_default:
-  - name: "linux_admins"
-    origin: "ALL"
-    comment: "Доменные администраторы"
-  - name: "g_ansible"
-    origin: "10.0.2.20"
-    comment: "Управляющий узел Ansible (domain)"
-  - name: "g_oszi"
-    origin: "10.0.2.19"
-    comment: "Сканер / Сервер ИБ (domain)"
-
 # Deny All в конце
 pam_ssh_access_deny_all: true
-
-# Дополнительные доменные группы (переопределяются в group_vars/host_vars)
-# Используйте для проектных/временных групп: админы 1С, аудиторы ИБ и т.д.
-pam_ssh_access_domain_groups_extra: []
-
-# Дополнительные локальные записи доступа (пользователи или группы)
-pam_ssh_access_local_extra: []
-# Локальный пользователь на standalone:
-# pam_ssh_access_local_extra:
-#   - name: "admin_1c"
-#     origin: "10.0.15.0/24"
-#     comment: "Админ 1С"
-#     type: "user"
-#     или
-#     type: "group" 
 
 # ==============================================================================
 # FAILLOCK

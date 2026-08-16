@@ -1,0 +1,33 @@
+# {{ ansible_managed }}
+# Managed by Ansible Role: security_sssd
+
+[domain/{{ item }}]
+id_provider = {{ sssd_domain_config_id_provider }}
+auth_provider = {{ sssd_domain_config_auth_provider }}
+ldap_id_mapping = {{ sssd_domain_config_ldap_id_mapping }}
+use_fully_qualified_names = {{ sssd_domain_config_use_fully_qualified_names }}
+ad_update_samba_machine_account_password = {{ sssd_domain_config_ad_update_samba_machine_account_password }}
+access_provider = {{ sssd_domain_config_access_provider }}
+{% if sssd_domain_config_access_provider == 'simple' %}
+{% if _sssd_domain_rules[item].users | length > 0 %}
+simple_allow_users = {{ _sssd_domain_rules[item].users | join(', ') }}
+{% endif %}
+{% if _sssd_domain_rules[item].groups | length > 0 %}
+simple_allow_groups = {{ _sssd_domain_rules[item].groups | join(', ') }}
+{% endif %}
+{% endif %}
+enumerate = {{ sssd_domain_config_enumerate }}
+ad_domain = {{ item }}
+krb5_realm = {{ item | upper }}
+krb5_validate = {{ sssd_domain_config_krb5_validate }}
+krb5_renew_interval = {{ sssd_domain_config_krb5_renew_interval }}
+krb5_renewable_lifetime = {{ sssd_domain_config_krb5_renewable_lifetime }}
+krb5_ccname_template = {{ sssd_domain_config_krb5_ccname_template }}
+cache_credentials = {{ sssd_domain_config_cache_credentials }}
+krb5_store_password_if_offline = {{ sssd_domain_config_krb5_store_password_if_offline }}
+entry_cache_timeout = {{ sssd_domain_config_entry_cache_timeout }}
+entry_cache_group_timeout = {{ sssd_domain_config_entry_cache_group_timeout }}
+refresh_expired_interval = {{ sssd_domain_config_refresh_expired_interval }}
+fallback_homedir = {{ sssd_domain_config_fallback_homedir }}
+override_shell = {{ sssd_domain_config_override_shell }}
+case_sensitive = {{ sssd_domain_config_case_sensitive }}

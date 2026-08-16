@@ -24,7 +24,7 @@
       - pam_ssh_backup_count | int > 0
     fail_msg: "[CRITICAL ERROR]: Ошибка в заданных параметрах PAM SSH!"
 
-- name: Определить активные SSH-правила с учетом доменного статуса
+- name: Pre-flight | Определить активные SSH-правила с учетом доменного статуса
   ansible.builtin.set_fact:
     _pam_ssh_active_rules: >-
       {{
@@ -94,20 +94,20 @@
         fail_msg: "[CRITICAL]: Отсутствует обязательный пакет SSSD: {{ item }}"
       loop: "{{ pam_ssh_required_packages_domain }}"
 
-    - name: Pre-flight | Сбор фактов о службах
-      ansible.builtin.service_facts:
-
-    - name: Pre-flight | Проверка службы SSSD
+    - name: Pre-flight | Проверка SSSD suffix в правилах доменного доступа
       ansible.builtin.assert:
         that:
-          - ansible_facts.services['sssd.service'] is defined
-        fail_msg: "[CRITICAL]: Служба sssd.service не найдена в системе!"
-
-    - name: Pre-flight | Проверка состояния SSSD
-      ansible.builtin.assert:
-        that:
-          - ansible_facts.services['sssd.service'].state == 'running'
-        fail_msg: "[CRITICAL]: Служба sssd.service не запущена!"
+          - item.sssd_suffix is defined
+          - item.sssd_suffix is string
+          - item.sssd_suffix | length > 0
+        fail_msg: >-
+          [CRITICAL ERROR]: Для SSSD-правила "{{ item.identity }}"
+          не указан обязательный параметр sssd_suffix!
+      loop: "{{ _pam_ssh_active_rules }}"
+      loop_control:
+        label: "{{ item.identity }}"
+      when:
+        - item.sssd | default(false) | bool
 
     - name: Pre-flight | Проверка типов доменных SSH-правил
       ansible.builtin.assert:
@@ -165,6 +165,21 @@
           that:
             - _pam_sss_gss_files.matched > 0
           fail_msg: "[CRITICAL]: PAM-модуль pam_sss_gss.so не найден!"
+
+    - name: Pre-flight | Сбор фактов о службах
+      ansible.builtin.service_facts:
+
+    - name: Pre-flight | Проверка службы SSSD
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['sssd.service'] is defined
+        fail_msg: "[CRITICAL]: Служба sssd.service не найдена в системе!"
+
+    - name: Pre-flight | Проверка состояния SSSD
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.services['sssd.service'].state == 'running'
+        fail_msg: "[CRITICAL]: Служба sssd.service не запущена!"
 
 #################################################################
 # ПРОВЕРКИ ПАРАМЕТРОВ ДОМАШНЕЙ ДИРЕКТОРИИ

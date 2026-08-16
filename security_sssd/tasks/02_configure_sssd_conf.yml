@@ -1,0 +1,29 @@
+---
+- name: Security SSSD | Настройка sssd.conf
+  ansible.builtin.template:
+    src: sssd.conf.j2
+    dest: "/etc/sssd/sssd.conf"
+    owner: root
+    group: root
+    mode: '0600'
+    backup: true
+#    validate: 'sssctl config-check --config %s'
+  register: _sssd_conf_result  
+
+- name: Security SSSD | Очистка старых бэкапов sssd.conf
+  block:
+    - name: Security SSSD | Поиск всех бэкапов sssd.conf
+      ansible.builtin.find:
+        paths: "/etc/sssd/"
+        patterns: "sssd.conf.*~"
+      register: _backups_sssd_conf
+
+    - name: Security SSSD | Удаление бэкапов sssd.conf кроме последних {{ sssd_backup_count }} 
+      ansible.builtin.file:
+        path: "{{ backup_item.path }}"
+        state: absent
+      loop: "{{ (_backups_sssd_conf.files | sort(attribute='mtime', reverse=true))[sssd_backup_count|int:] }}"
+      when: _backups_sssd_conf.files | length > (sssd_backup_count | int)
+      loop_control:
+        loop_var: backup_item
+  when: _sssd_conf_result is changed

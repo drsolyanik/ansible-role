@@ -1,0 +1,63 @@
+sssd_backup_count: 3
+
+access_profiles_default: {}
+access_profiles_extra: {}
+sssd_access_rules: >-
+  {{
+    access_profiles_default
+    | combine(
+        access_profiles_extra,
+        recursive=true
+      )
+  }}
+
+domain_joined: true
+
+domain_suffix: "domain.local"
+sssd_domain: "{{ domain_suffix }}"
+
+sssd_required_packages:
+  - sssd 
+  - sssd-tools 
+  - libnss-sss 
+  - libpam-sss
+  - libsss-sudo
+
+sssd_config_user: "root"
+sssd_config_services:
+  - pam
+  - nss
+sssd_config_core_dumpable: false
+sssd_config_default_domain_suffix: ""
+
+sssd_nss_config_entry_negative_timeout: 15
+sssd_nss_config_entry_cache_nowait_percentage: 10
+
+sssd_pam_config_pam_verbosity: 2
+sssd_pam_config_pam_pwd_expiration_warning: 7
+sssd_pam_config_pam_account_locked_message: "Your account is blocked, please contact technical support."
+sssd_pam_config_pam_gssapi_services: 
+  - sudo
+  - sudo-i
+sssd_pam_config_debug_level_enabled: false
+sssd_pam_config_debug_level: 8
+
+sssd_domain_config_id_provider: ad
+sssd_domain_config_auth_provider: ad
+sssd_domain_config_ldap_id_mapping: true
+sssd_domain_config_use_fully_qualified_names: true
+sssd_domain_config_ad_update_samba_machine_account_password: true
+sssd_domain_config_access_provider: simple
+sssd_domain_config_enumerate: false
+sssd_domain_config_krb5_validate: true
+sssd_domain_config_krb5_renew_interval: "30m"
+sssd_domain_config_krb5_renewable_lifetime: "7d"
+sssd_domain_config_krb5_ccname_template: "KEYRING:persistent:%U"
+sssd_domain_config_cache_credentials: false
+sssd_domain_config_krb5_store_password_if_offline: false
+sssd_domain_config_entry_cache_timeout: 14400
+sssd_domain_config_entry_cache_group_timeout: 1800
+sssd_domain_config_refresh_expired_interval: 0
+sssd_domain_config_fallback_homedir: "/home/%d/%u"
+sssd_domain_config_override_shell: "/bin/bash"
+sssd_domain_config_case_sensitive: false

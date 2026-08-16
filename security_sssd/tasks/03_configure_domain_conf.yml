@@ -1,0 +1,46 @@
+- name: Security SSSD | Формирование правил доступа для доменов SSSD
+  ansible.builtin.set_fact:
+    _sssd_domain_rules: >-
+      {{
+        _sssd_domain_rules | default({})
+        | combine({
+            item: {
+              'users': (
+                _sssd_active_rules
+                | selectattr('sssd_suffix', 'equalto', item)
+                | selectattr('type', 'equalto', 'user')
+                | map(attribute='identity')
+                | map('regex_replace', '$', '@' ~ item)
+                | list
+              ),
+              'groups': (
+                _sssd_active_rules
+                | selectattr('sssd_suffix', 'equalto', item)
+                | selectattr('type', 'equalto', 'group')
+                | map(attribute='identity')
+                | map('regex_replace', '$', '@' ~ item)
+                | list
+              )
+            }
+          })
+      }}
+  loop: "{{ _sssd_suffixes }}"
+
+- name: Security SSSD | Настройка доменной конфигурации
+  ansible.builtin.template:
+    src: domain.conf.j2
+    dest: "/etc/sssd/conf.d/{{ item }}.conf"
+    owner: root
+    group: root
+    mode: '0600'
+  loop: "{{ _sssd_suffixes }}"
+  loop_control:
+    label: "{{ item }}"
+  notify:
+    - Security SSSD | Restart SSSD
+    - Security SSSD | Restart SSH
+
+- name: Security SSSD | Проверка конфигурации SSSD
+  ansible.builtin.command:
+    cmd: sssctl config-check
+  changed_when: false

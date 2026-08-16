@@ -1,0 +1,188 @@
+---
+- name: Pre-flight | Проверка присоединения сервера к домену
+  ansible.builtin.assert:
+    that:
+      - domain_joined is defined
+      - domain_joined is boolean
+      - domain_joined is sameas true
+    fail_msg: >-
+      [CRITICAL]: Сервер не помечен как присоединённый к домену!
+      Для настройки SSSD параметр domain_joined должен быть установлен в true.
+
+- name: Pre-flight | Проверка поддерживаемой операционной системы
+  ansible.builtin.assert:
+    that:
+      - (ansible_facts['os_family'] in ['Debian', 'Astra Linux']) or
+        (ansible_facts['distribution'] in ['Debian', 'Astra Linux'])
+    fail_msg: >-
+      Ошибка: Роль не может быть выполнена на этом сервере!
+      Текущая ОС: {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}).
+      Поддерживаемые дистрибутивы: Debian, Astra Linux.
+    success_msg: "ОС {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}) поддерживается роли."
+
+- name: Pre-flight | Определить правил доменного доступа к серверу
+  ansible.builtin.set_fact:
+    _sssd_active_rules: >-
+      {{
+        sssd_access_rules.values()
+        | selectattr('sssd', 'defined')
+        | selectattr('sssd')
+        | list
+      }}
+
+- name: Pre-flight | Проверка наличия правил доменного доступа
+  ansible.builtin.assert:
+    that: 
+      - _sssd_active_rules is defined
+      - _sssd_active_rules | length > 0
+    fail_msg: "[CRITICAL]: Список правил доменного доступа пуст!"
+
+- name: Pre-flight | Проверка SSSD suffix в правилах доменного доступа
+  ansible.builtin.assert:
+    that:
+      - item.sssd_suffix is defined
+      - item.sssd_suffix is string
+      - item.sssd_suffix | length > 0
+    fail_msg: >-
+      [CRITICAL]: Для SSSD-правила "{{ item.identity }}"
+      не указан обязательный параметр sssd_suffix!
+  loop: "{{ _sssd_active_rules }}"
+  loop_control:
+    label: "{{ item.identity }}"
+
+- name: Pre-flight | Проверка правил доменного доступа
+  ansible.builtin.assert:
+    that:
+      - item.identity is regex('^[a-z_][a-z0-9_-]{0,31}$')
+      - item.identity | length > 0
+      - item.type in ['user', 'group']
+      - item.source == 'domain'
+      - item.sssd is sameas true
+    fail_msg: "[CRITICAL]: Ошибка в списке правил доменного доступа!"
+  loop: "{{ _sssd_active_rules }}"
+
+- name: Pre-flight | Инициализация списка SSSD suffix
+  ansible.builtin.set_fact:
+    _sssd_suffixes: []
+
+- name: Pre-flight | Сбор всех SSSD suffix
+  ansible.builtin.set_fact:
+    _sssd_suffixes: "{{ _sssd_suffixes + [item.sssd_suffix] }}"
+  loop: "{{ _sssd_active_rules }}"
+
+- name: Pre-flight | Сбор уникальных SSSD suffix
+  ansible.builtin.set_fact:
+    _sssd_suffixes: >-
+      {{
+        (_sssd_suffixes + [item.sssd_suffix])
+        | unique
+        | list
+      }}
+  loop: "{{ _sssd_active_rules }}"
+
+- name: Pre-flight | Проверка указанных параметров для основного блока в sssd.conf
+  ansible.builtin.assert:
+    that:
+      - sssd_config_user is string
+      - sssd_config_user in ['', 'root', '_sssd']
+      - _sssd_suffixes | length > 0
+      - sssd_config_core_dumpable is boolean
+      - sssd_domain_config_use_fully_qualified_names is boolean
+      - sssd_config_default_domain_suffix is string
+      - >
+        (sssd_config_default_domain_suffix | length == 0)
+        or
+        (sssd_config_default_domain_suffix is regex(
+          '^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$'
+        ))
+    fail_msg: "[CRITICAL]: Ошибка в заданных параметрах sssd.conf!"
+
+- name: Pre-flight | Проверка указанных параметров блока NSS в sssd.conf
+  ansible.builtin.assert:
+    that:
+      - sssd_nss_config_entry_negative_timeout is integer
+      - sssd_nss_config_entry_negative_timeout >= 0
+      - sssd_nss_config_entry_cache_nowait_percentage is integer
+      - sssd_nss_config_entry_cache_nowait_percentage >= 0
+      - sssd_nss_config_entry_cache_nowait_percentage <= 99
+    fail_msg: "[CRITICAL]: Ошибка в заданных параметрах NSS!"
+  when: "'nss' in sssd_config_services"
+
+- name: Pre-flight | Проверка указанных параметров блока PAM в sssd.conf
+  ansible.builtin.assert:
+    that:
+      - sssd_pam_config_pam_verbosity is integer
+      - sssd_pam_config_pam_verbosity >= 0
+      - sssd_pam_config_pam_verbosity <= 3
+      - sssd_pam_config_pam_pwd_expiration_warning is integer
+      - sssd_pam_config_pam_pwd_expiration_warning >= 0
+      - sssd_pam_config_pam_account_locked_message is string
+      - (sssd_pam_config_debug_level is integer) and (sssd_pam_config_debug_level  >= 0) and (sssd_pam_config_debug_level <= 9)
+    fail_msg: "[CRITICAL]: Ошибка в заданных параметрах PAM!"
+  when: "'pam' in sssd_config_services"
+
+- name: Pre-flight | Проверка указанных параметров для конфигурации секции домена
+  ansible.builtin.assert:
+    that:
+      - sssd_domain_config_id_provider is string
+      - sssd_domain_config_id_provider in ['proxy', 'ldap', 'ipa', 'ad', 'idp']
+      - sssd_domain_config_auth_provider is string
+      - sssd_domain_config_auth_provider in ['ldap', 'krb5', 'ipa', 'ad', 'idp', 'proxy', 'none']
+      - sssd_domain_config_access_provider is string
+      - sssd_domain_config_access_provider in ['permit', 'deny', 'ldap', 'ipa', 'ad', 'simple', 'krb5', 'proxy']
+      - sssd_domain_config_ldap_id_mapping is boolean
+      - sssd_domain_config_use_fully_qualified_names is boolean
+      - sssd_domain_config_ad_update_samba_machine_account_password is boolean
+      - sssd_domain_config_enumerate is boolean
+      - sssd_domain_config_krb5_validate is boolean
+      - sssd_domain_config_cache_credentials is boolean
+      - sssd_domain_config_krb5_store_password_if_offline is boolean
+      - sssd_domain_config_case_sensitive is boolean
+      - sssd_domain_config_krb5_renew_interval is string
+      - >
+        sssd_domain_config_krb5_renew_interval is regex(
+          '^[0-9]+[smhd]$'
+        )
+      - sssd_domain_config_krb5_renewable_lifetime is string
+      - >
+        sssd_domain_config_krb5_renewable_lifetime is regex(
+          '^[0-9]+[smhd]$'
+        )
+      - sssd_domain_config_krb5_ccname_template is string
+      - sssd_domain_config_krb5_ccname_template | length > 0
+      - sssd_domain_config_entry_cache_timeout is integer
+      - sssd_domain_config_entry_cache_timeout >= 0
+      - sssd_domain_config_override_shell is string
+      - sssd_domain_config_override_shell | length > 0
+      - sssd_domain_config_override_shell is regex('^/.+')
+      - sssd_domain_config_entry_cache_group_timeout is integer
+      - sssd_domain_config_entry_cache_group_timeout >= 0
+      - sssd_domain_config_refresh_expired_interval is integer
+      - sssd_domain_config_refresh_expired_interval >= 0
+    fail_msg: "[CRITICAL]: Ошибка в заданных параметрах конфигурации секции домена!"
+
+- name: Pre-flight | Сбор фактов о пакетах
+  ansible.builtin.package_facts:
+    manager: apt
+
+- name: Pre-flight | Проверка обязательных пакетов
+  ansible.builtin.assert:
+    that:
+      - item in ansible_facts.packages
+    fail_msg: "[CRITICAL]: Отсутствует обязательный пакет: {{ item }}"
+  loop: "{{ sssd_required_packages }}"
+
+- name: Pre-flight | Сбор фактов о службах
+  ansible.builtin.service_facts:
+
+- name: Pre-flight | Проверка службы SSSD
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.services['sssd.service'] is defined
+    fail_msg: "[CRITICAL]: Служба sssd.service не найдена в системе!"
+
+- name: Pre-flight | Проверка состояния SSSD
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.services['sssd.service'].state == 'running'
+    fail_msg: "[CRITICAL]: Служба sssd.service не запущена!"

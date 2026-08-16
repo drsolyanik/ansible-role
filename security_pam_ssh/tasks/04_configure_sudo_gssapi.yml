@@ -18,7 +18,7 @@
   when: item.stat.exists
   register: _pam_sudo_lineinfile_result
 
-- name: Security PAM SSH | Очистка старых бэкапов sudo (более 3)
+- name: Security PAM SSH | Очистка старых бэкапов sudo кроме последних {{ pam_ssh_backup_count }} 
   ansible.builtin.shell: |
     ls -t {{ item.item | quote }}.*~ 2>/dev/null | tail -n +{{ (pam_ssh_backup_count | int) + 1 }} | xargs -r rm -f
   loop: "{{ _pam_sudo_lineinfile_result.results }}"

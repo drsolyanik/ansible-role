@@ -17,7 +17,7 @@
         patterns: "{{ pam_ssh_access_file | basename }}.*~"
       register: _backups_access_conf
 
-    - name: Security PAM SSH | Удаление бэкапов старше {{ pam_ssh_backup_count }} последних
+    - name: Security PAM SSH | Удаление бэкапов кроме последних {{ pam_ssh_backup_count }} 
       ansible.builtin.file:
         path: "{{ backup_item.path }}"
         state: absent

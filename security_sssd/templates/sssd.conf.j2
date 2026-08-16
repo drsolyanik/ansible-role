@@ -1,0 +1,38 @@
+# {{ ansible_managed }}
+# Managed by Ansible Role: security_sssd
+
+[sssd]
+{% if sssd_config_user | length > 0 %}
+user = {{ sssd_config_user }}
+{% endif %}
+domains = {{ _sssd_suffixes | join(', ') }}
+{% if sssd_config_default_domain_suffix | length > 0 %}
+default_domain_suffix = {{ sssd_config_default_domain_suffix }}
+{% endif %}
+{% if sssd_config_services | length > 0 %}
+services = {{ sssd_config_services | join(', ') }}
+{% endif %}
+core_dumpable = {{ sssd_config_core_dumpable }}
+
+{% if 'nss' in sssd_config_services %}
+[nss]
+entry_negative_timeout = {{ sssd_nss_config_entry_negative_timeout }}
+entry_cache_nowait_percentage = {{ sssd_nss_config_entry_cache_nowait_percentage }}
+{% endif %}
+
+{% if 'pam' in sssd_config_services %}
+[pam]
+pam_verbosity = {{ sssd_pam_config_pam_verbosity }}
+pam_pwd_expiration_warning = {{ sssd_pam_config_pam_pwd_expiration_warning }}
+{% if sssd_pam_config_pam_account_locked_message | length > 0 %}
+pam_account_locked_message = {{ sssd_pam_config_pam_account_locked_message }}
+{% endif %}
+{% if sssd_pam_config_pam_gssapi_services | length > 0 %}
+pam_gssapi_services = {{ sssd_pam_config_pam_gssapi_services | join(', ') }}
+{% endif %}
+{% if sssd_pam_config_debug_level_enabled %}
+debug_level = {{ sssd_pam_config_debug_level }}
+{% else %}
+#debug_level = {{ sssd_pam_config_debug_level }}
+{% endif %}
+{% endif %}

@@ -15,7 +15,7 @@
 + : ({{ entry.identity }}) : {{ entry.ssh_origin }}
 {% endif %}
 {% elif entry.source == "domain" %}
-+ : ({{ entry.identity }}@{{ pam_ssh_domain }}) : {{ entry.ssh_origin }}
++ : ({{ entry.identity }}@{{ entry.sssd_suffix }}) : {{ entry.ssh_origin }}
 {% endif %}
 {% endif %}
 

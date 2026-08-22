@@ -1,0 +1,19 @@
+---
+sudoers_dir: "/etc/sudoers.d"
+
+sudoers_filename: "10_ansible_profile_"
+
+sudoers_purge_unmanaged: true
+
+domain_joined: false
+
+access_profiles_default: {}
+access_profiles_extra: {}
+sudo_access_rules: >-
+  {{
+    access_profiles_default
+    | combine(
+        access_profiles_extra,
+        recursive=true
+      )
+  }}

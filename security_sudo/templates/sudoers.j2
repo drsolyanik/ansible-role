@@ -1,0 +1,10 @@
+# {{ ansible_managed }}
+# Managed by Ansible Role: security_sudo
+
+# {{ item.description | default('No description') }}
+{% set identity_clean = item.identity | replace(' ', '\ ') %}
+{% set prefix = '%' if item.type == 'group' else '' %}
+{% set suffix = '@' ~ item.sssd_suffix if (item.sssd | default(false) and item.sssd_suffix is defined) else '' %}
+{% for privilege in item.sudo_privileges %}
+{{ prefix }}{{ identity_clean }}{{ suffix }} {{ privilege }}
+{% endfor %}

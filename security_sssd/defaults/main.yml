@@ -13,9 +13,6 @@ sssd_access_rules: >-
 
 domain_joined: true
 
-domain_suffix: "domain.local"
-sssd_domain: "{{ domain_suffix }}"
-
 sssd_required_packages:
   - sssd 
   - sssd-tools 

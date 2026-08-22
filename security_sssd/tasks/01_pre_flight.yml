@@ -53,7 +53,7 @@
 - name: Pre-flight | Проверка правил доменного доступа
   ansible.builtin.assert:
     that:
-      - item.identity is regex('^[a-z_][a-z0-9_-]{0,31}$')
+      - (item.type == 'user' and item.identity is regex('^[a-zA-Z0-9_.-]+$')) or ( item.type == 'group' and item.identity is regex('^[a-zA-Z0-9_. -]+$'))
       - item.identity | length > 0
       - item.type in ['user', 'group']
       - item.source == 'domain'

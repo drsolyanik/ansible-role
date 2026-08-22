@@ -1,0 +1,23 @@
+---
+- name: Security SUDO | Расчет списка активных конфигурационных файлов
+  ansible.builtin.set_fact:
+    _active_sudo_files: >-
+      {{
+        _sudo_active_rules
+        | map(attribute='profile')
+        | map('regex_replace', '^', sudoers_dir ~ '/' ~ sudoers_filename)
+        | list
+      }}
+
+- name: Security SUDO | Поиск всех имеющихся файлов роли на целевом хосте
+  ansible.builtin.find:
+    paths: "{{ sudoers_dir }}"
+    patterns: "{{ sudoers_filename }}*"
+    file_type: file
+  register: _existing_sudo_files
+
+- name: Security SUDO | Очистка устаревших sudo конфигов
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop: "{{ _existing_sudo_files.files | map(attribute='path') | difference(_active_sudo_files) }}"

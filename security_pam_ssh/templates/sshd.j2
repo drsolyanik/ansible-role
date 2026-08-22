@@ -9,7 +9,7 @@
 auth       required  pam_faillock.so preauth silent deny={{ pam_ssh_faillock_deny }} unlock_time={{ pam_ssh_faillock_unlock_time }}
 {% endif %}
 
-{% if pam_ssh_domain_server | default(false) | bool %}
+{% if domain_joined | default(false) | bool %}
 # Если пользователь локальный -> прыгаем через 1 строку (к pam_unix), минуя проверку домена.
 # Если пользователь доменный -> игнорируем прыжок и идем к pam_sss
 auth        [success=1 default=ignore]  pam_localuser.so
@@ -42,7 +42,7 @@ account    required     pam_nologin.so
 # Проверяем права на вход по спискам из файла {{ pam_ssh_access_file }}
 account     required      pam_access.so accessfile={{ pam_ssh_access_file }}
 
-{% if pam_ssh_domain_server | default(false) | bool %}
+{% if domain_joined | default(false) | bool %}
 # Маршрутизация (Разделение локальных и доменных учетных записей)
 # Если пользователь локальный -> прыгаем через 1 строку и идем к pam_unix, минуя проверку домена.
 # Если пользователь доменный -> игнорируем прыжок и идем к pam_sss.
@@ -80,7 +80,7 @@ session     required      pam_env.so user_readenv=1 envfile=/etc/default/locale
 session     optional      pam_systemd.so
 
 session     required      pam_unix.so
-{% if pam_ssh_domain_server | default(false) | bool %}
+{% if domain_joined | default(false) | bool %}
 session     optional      pam_sss.so
 {% endif %}
 
@@ -94,7 +94,7 @@ session [success=ok ignore=ignore module_unknown=ignore default=bad]        pam_
 # =======================================================================
 # ЭТАП PASSWORD (Смена и управление сложностью паролей)
 # =======================================================================
-{% if pam_ssh_domain_server | default(false) | bool %}
+{% if domain_joined | default(false) | bool %}
 # Локальный вход
 # Если пользователь локальный -> выполняем проверку локальной сложности пароля
 # Если доменный -> перепрыгиваем проверку локальной сложности
@@ -105,7 +105,7 @@ password [success=ignore default=1]                      pam_localuser.so
 # Применяет требования к длине, спецсимволам и регистру из /etc/security/pwquality.conf
 password    required      pam_pwquality.so
 
-{% if pam_ssh_domain_server | default(false) | bool %}
+{% if domain_joined | default(false) | bool %}
 # Изменение пароля в корпоративном домене
 # Если меняется доменный пароль -> транслируем изменения в домен и завершаем этап (done)
 password    [success=done default=ignore]                     pam_sss.so

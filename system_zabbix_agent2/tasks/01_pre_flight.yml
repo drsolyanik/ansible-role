@@ -24,7 +24,7 @@
   ansible.builtin.assert:
     that:
       - not port_check.failed
-    fail_msg: "[NETWORK ERROR]: Порт 10051 Zabbix сервера недоступен! (Таймаут {{ port_check.elapsed }}с)"
+    fail_msg: "[NETWORK]: Порт 10051 Zabbix сервера недоступен! (Таймаут {{ port_check.elapsed }}с)"
 
 - name: Pre-flight | Проверка доступности веб-сервиса Zabbix
   ansible.builtin.uri:
@@ -39,7 +39,7 @@
   ansible.builtin.assert:
     that:
       - not http_check.failed
-    fail_msg: "[NETWORK ERROR]: Порт {{ zabbix_server_port }} на Zabbix сервере недоступен!"
+    fail_msg: "[NETWORK]: Порт {{ zabbix_server_port }} на Zabbix сервере недоступен!"
 
 - name: Pre-flight | Проверка указанных параметров Zabbix-агента
   ansible.builtin.assert:
@@ -50,4 +50,4 @@
       - zabbix_agent_debug_level | int >= 0 and zabbix_agent_debug_level | int <= 5
       - zabbix_agent_log_file_size | int >= 0 and zabbix_agent_log_file_size | int <= 1024
       - zabbix_agent_log_type in ['system', 'file', 'console']
-    fail_msg: "[CRITICAL ERROR]: Ошибка в заданных параметрах Zabbix-агента!"
+    fail_msg: "[CRITICAL]: Ошибка в заданных параметрах Zabbix-агента!"

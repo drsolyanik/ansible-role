@@ -22,7 +22,7 @@
       - pam_ssh_access_file | length > 0 and pam_ssh_access_file is regex('^/')
       - pam_ssh_password_remember | int > 0
       - pam_ssh_backup_count | int > 0
-    fail_msg: "[CRITICAL ERROR]: Ошибка в заданных параметрах PAM SSH!"
+    fail_msg: "[CRITICAL]: Ошибка в заданных параметрах PAM SSH!"
 
 - name: Pre-flight | Определить активные SSH-правила с учетом доменного статуса
   ansible.builtin.set_fact:
@@ -40,7 +40,7 @@
           | selectattr('ssh')
           | selectattr('source', 'equalto', 'domain')
           | list
-          if pam_ssh_domain_server | default(false)
+          if domain_joined | default(false)
           else []
         )
       }}
@@ -50,16 +50,16 @@
     that: 
       - _pam_ssh_active_rules is defined
       - _pam_ssh_active_rules | length > 0
-    fail_msg: "[CRITICAL ERROR]: Список активных SSH-правил пуст!"
+    fail_msg: "[CRITICAL]: Список активных SSH-правил пуст!"
 
 - name: Pre-flight | Проверка активные SSH-правил
   ansible.builtin.assert:
     that:
-      - item.identity is regex('^[a-z_][a-z0-9_-]{0,31}$')
+      - (item.type == 'user' and item.identity is regex('^[a-zA-Z0-9_.-]+$')) or ( item.type == 'group' and item.identity is regex('^[a-zA-Z0-9_. -]+$'))
       - item.identity | length > 0
       - item.type in ['user', 'group']
       - item.source in ['local', 'domain']
-    fail_msg: "[CRITICAL ERROR]: Ошибка в списке активных SSH-правил!"
+    fail_msg: "[CRITICAL]: Ошибка в списке активных SSH-правил!"
   loop: "{{ _pam_ssh_active_rules }}"
 
 - name: Pre-flight | Проверка параметров временной блокировки
@@ -85,7 +85,7 @@
 # ПРОВЕРКИ ДОМЕННЫХ ПАРАМЕТРОВ
 #################################################################
 - name: Pre-flight | Проверка доменных параметров модуля PAM
-  when: pam_ssh_domain_server | default(false) | bool
+  when: domain_joined | default(false) | bool
   block:
     - name: Pre-flight | Проверка обязательных пакетов SSSD
       ansible.builtin.assert:
@@ -100,8 +100,9 @@
           - item.sssd_suffix is defined
           - item.sssd_suffix is string
           - item.sssd_suffix | length > 0
+          - item.sssd_suffix is regex('^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$')
         fail_msg: >-
-          [CRITICAL ERROR]: Для SSSD-правила "{{ item.identity }}"
+          [CRITICAL]: Для SSSD-правила "{{ item.identity }}"
           не указан обязательный параметр sssd_suffix!
       loop: "{{ _pam_ssh_active_rules }}"
       loop_control:
@@ -114,7 +115,7 @@
         that:
           - item.type == 'group'
         fail_msg: >-
-          [CRITICAL ERROR]: Для доменного SSH-правила
+          [CRITICAL]: Для доменного SSH-правила
           "{{ item.identity }}" тип должен быть "group",
           получено: "{{ item.type }}"
       loop: "{{ _pam_ssh_active_rules }}"
@@ -123,12 +124,12 @@
     - name: Pre-flight | Проверка доменного суффикса
       ansible.builtin.assert:
         that: 
-          - pam_ssh_domain | length > 0
-          - pam_ssh_domain is regex('^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$')
+          - domain_suffix | length > 0
+          - domain_suffix is regex('^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$')
         fail_msg: "[CRITICAL]: Невалидный или пустой доменный суффикс!"
     
     - name: Pre-flight | DNS-запрос для A записи домена 
-      ansible.builtin.command: "getent ahosts {{ pam_ssh_domain }}"
+      ansible.builtin.command: "getent ahosts {{ domain_suffix }}"
       register: _dns_a_records
       changed_when: false
       ignore_errors: true
@@ -138,7 +139,7 @@
         that:
           - _dns_a_records.rc == 0
           - _dns_a_records.stdout | length > 0
-        fail_msg: "[CRITICAL]: Не найдена запись A для доменного сервера {{ pam_ssh_domain }}!"   
+        fail_msg: "[CRITICAL]: Не найдена запись A для доменного сервера {{ domain_suffix }}!"   
     
     - name: Pre-flight | Проверка настроек для GSSAPI sudo
       when: pam_ssh_gssapi_sudo_enable | default(false) | bool

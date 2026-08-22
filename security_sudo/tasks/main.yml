@@ -1,0 +1,10 @@
+---
+- name: Security SUDO | 01. Pre-flight валидация переменных и окружения
+  ansible.builtin.import_tasks: 01_pre_flight.yml
+
+- name: Security SUDO | Настройка sudoers
+  ansible.builtin.import_tasks: 02_configure_sudoers.yml
+
+- name: Security SUDO | Очистка неуправляемых sudoers файлов
+  ansible.builtin.include_tasks: 03_purge.yml
+  when: sudoers_purge_unmanaged | default(false) | bool

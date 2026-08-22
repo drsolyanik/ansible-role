@@ -8,7 +8,7 @@
   ansible.builtin.assert:
     that:
       - item.stat.exists
-    fail_msg: "[CRITICAL ERROR]: SSH ключ {{ item.item }} не найден!"
+    fail_msg: "[CRITICAL]: SSH ключ {{ item.item }} не найден!"
   loop: "{{ ssh_host_key_stats.results | default([]) }}"
   loop_control:
     label: "{{ item.item }}"
@@ -23,7 +23,7 @@
       - ssh_password_authentication in ['yes', 'no']
       - ssh_pubkey_authentication in ['yes', 'no']
       - ssh_password_authentication == 'yes' or ssh_pubkey_authentication == 'yes'
-    fail_msg: "[CRITICAL ERROR]: Ошибка в заданных параметрах SSH!"
+    fail_msg: "[CRITICAL]: Ошибка в заданных параметрах SSH!"
 
 - name: Pre-flight | Проверка параметров баннера
   ansible.builtin.assert:
@@ -32,7 +32,7 @@
       - ssh_company_name | default('') | length > 0
       - ssh_security_contacts | default([]) | length > 0
     fail_msg: >-
-      [CRITICAL ERROR]:
+      [CRITICAL]:
       ssh_enable_banner задан 'true', но одна из обязательных переменных не задана 
       (ssh_banner_path, ssh_company_name, ssh_security_contacts) не должны быть пустыми!
   when: ssh_enable_banner | default(false) | bool
@@ -49,14 +49,14 @@
         that:
           - auth_keys_check.stat.exists
           - auth_keys_check.stat.size > 0
-        fail_msg: "[CRITICAL ERROR]: Отключен вход по паролю, но файл authorized_keys для пользователя {{ ansible_user }} отсутствует или пуст!"
+        fail_msg: "[CRITICAL]: Отключен вход по паролю, но файл authorized_keys для пользователя {{ ansible_user }} отсутствует или пуст!"
   when: 
     - ssh_password_authentication == "no"
     - ssh_pubkey_authentication == "yes"
 
 - name: Pre-flight | Проверка самоблокировки через AllowUsers
   ansible.builtin.fail:
-    msg: "[CRITICAL ERROR]: Текущий пользователь {{ ansible_user }} отсутствует в ssh_allow_users. Вы потеряете доступ!"
+    msg: "[CRITICAL]: Текущий пользователь {{ ansible_user }} отсутствует в ssh_allow_users. Вы потеряете доступ!"
   when:
     - ssh_allow_users | default([]) | length > 0
     - ansible_user not in ssh_allow_users

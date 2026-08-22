@@ -1,0 +1,126 @@
+---
+- name: Pre-flight | Проверка поддерживаемой операционной системы
+  ansible.builtin.assert:
+    that:
+      - (ansible_facts['os_family'] in ['Debian', 'Astra Linux']) or
+        (ansible_facts['distribution'] in ['Debian', 'Astra Linux'])
+    fail_msg: >-
+      Ошибка: Роль не может быть выполнена на этом сервере!
+      Текущая ОС: {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}).
+      Поддерживаемые дистрибутивы: Debian, Astra Linux.
+    success_msg: "ОС {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}) поддерживается роли."
+
+- name: Pre-flight | Проверка указанных параметров для SUDOERS
+  ansible.builtin.assert:
+    that:
+      - sudoers_dir is string
+      - sudoers_dir is regex('^/')
+      - sudoers_filename is string
+      - sudoers_filename | length > 0
+      - sudoers_purge_unmanaged is boolean
+      - domain_joined is boolean
+      - sudo_access_rules is defined
+      - sudo_access_rules is mapping
+      - sudo_access_rules | length > 0
+    fail_msg: "[CRITICAL]: Ошибка в заданных параметрах SUDOERS!"
+
+- name: Pre-flight | Определить активные SUDO-правила с учетом доменного статуса
+  ansible.builtin.set_fact:
+    _sudo_active_rules: >-
+      {{
+        sudo_access_rules.values()
+        | selectattr('sudo', 'defined')
+        | selectattr('sudo')
+        | rejectattr('source', 'equalto', 'domain')
+        | list
+        +
+        (
+          sudo_access_rules.values()
+          | selectattr('sudo', 'defined')
+          | selectattr('sudo')
+          | selectattr('source', 'equalto', 'domain')
+          | list
+          if domain_joined | default(false) | bool
+          else []
+        )
+      }}
+
+- name: Pre-flight | Проверка наличия активных SUDO-правил
+  ansible.builtin.assert:
+    that:
+      - _sudo_active_rules is defined
+      - _sudo_active_rules | length > 0
+    fail_msg: "[CRITICAL]: Список активных SUDO-правилах пуст!"
+
+- name: Pre-flight | Проверка структуры элементов активных SUDO-правил
+  ansible.builtin.assert:
+    that:
+      - item.identity | length > 0
+      - item.type in ['user', 'group']
+      - (item.type == 'user' and item.identity is regex('^[a-zA-Z0-9_.-]+$')) or 
+        ( item.type == 'group' and item.identity is regex('^[a-zA-Z0-9_. -]+$'))
+      - item.source in ['local', 'domain']
+      - item.sudo is boolean
+      - item.sudo_privileges is sequence
+      - item.sudo_privileges | length > 0
+      - item.profile is defined
+      - item.profile is regex('^[a-zA-Z0-9_.-]+$')
+    fail_msg: "[CRITICAL]: Ошибка в структуре правил для объекта '{{ item.identity | default('UNKNOWN') }}'!"
+  loop: "{{ _sudo_active_rules }}"
+  loop_control:
+    label: "{{ item.identity | default('unknown') }}"
+
+- name: Pre-flight | Проверка уникальности profile в активных SUDO-правилах
+  ansible.builtin.assert:
+    that:
+      - >-
+        (
+          _sudo_active_rules
+          | map(attribute='profile')
+          | list
+          | length
+        )
+        ==
+        (
+          _sudo_active_rules
+          | map(attribute='profile')
+          | unique
+          | list
+          | length
+        )
+    fail_msg: "[CRITICAL]: Значение profile должно быть уникальным для всех активных SUDO-правил!"
+
+- name: Pre-flight | Проверка параметра sssd_suffix
+  ansible.builtin.assert:
+    that:
+      - item.sssd_suffix is defined
+      - item.sssd_suffix is string
+      - item.sssd_suffix | length > 0
+      - item.sssd_suffix is regex('^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$')
+    fail_msg: "[CRITICAL]: Для объекта '{{ item.identity }}' неправильно задан sssd_suffix!"
+  loop: "{{ _sudo_active_rules }}"
+  loop_control:
+    label: "{{ item.identity }}"
+  when: item.sssd | default(false) | bool
+
+- name: Pre-flight | Чтение основного файла /etc/sudoers
+  ansible.builtin.slurp:
+    src: /etc/sudoers
+  register: _sudoers_raw
+
+- name: Pre-flight | Проверка наличия инклуда для директории {{ sudoers_dir }}
+  ansible.builtin.assert:
+    that:
+      - >-
+        _sudoers_raw.content | b64decode
+        is regex('(?m)^(@includedir|#includedir)\s+' ~ (sudoers_dir | regex_escape) ~ '\s*$')
+    fail_msg: "[CRITICAL]: В /etc/sudoers отсутствует директива '@includedir {{ sudoers_dir }}'!"
+
+- name: Pre-flight | Сбор фактов о пакетах
+  ansible.builtin.package_facts:
+    manager: apt
+
+- name: Pre-flight | Проверка наличия пакета sudo
+  ansible.builtin.assert:
+    that: "'sudo' in ansible_facts.packages"
+    fail_msg: "[CRITICAL]: Отсутствует обязательный пакет: sudo"

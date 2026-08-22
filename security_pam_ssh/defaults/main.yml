@@ -16,10 +16,8 @@ pam_ssh_rules: >-
 pam_ssh_backup_count: 3
 # Сервер в домене (FreeIPA / AD / SSSD)
 domain_joined: false
-pam_ssh_domain_server: "{{ domain_joined | default(false) | bool }}"
 
 domain_suffix: "domain.local"
-pam_ssh_domain: "{{ domain_suffix }}"
 
 pam_ssh_required_packages_domain:
   - sssd
@@ -45,7 +43,7 @@ pam_ssh_mkhomedir_skel: "/etc/skel"
 # ==============================================================================
 # GSSAPI ДЛЯ SUDO
 # ==============================================================================
-pam_ssh_gssapi_sudo_enable: "{{ pam_ssh_domain_server | default(false) | bool }}"
+pam_ssh_gssapi_sudo_enable: "{{ domain_joined | default(false) | bool }}"
 pam_ssh_gssapi_sudo_files:
   - "/etc/pam.d/sudo"
   - "/etc/pam.d/sudo-i"

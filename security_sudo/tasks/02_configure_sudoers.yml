@@ -1,0 +1,39 @@
+---
+- name: Security SUDO | Проверка директории "{{ sudoers_dir }}"
+  ansible.builtin.file:
+    path: "{{ sudoers_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Security SUDO | Настройка sudoers файлов
+  ansible.builtin.template:
+    src: sudoers.j2
+    dest: "{{ sudoers_dir }}/{{ sudoers_filename }}{{ item.profile }}"
+    owner: root
+    group: root
+    mode: '0440'
+    backup: false
+    validate: '/usr/sbin/visudo -cf %s'
+  loop: "{{ _sudo_active_rules }}"
+  loop_control:
+    label: "{{ item.profile }}"
+
+- name: Security SUDO | Проверка наличия утилиты pdpl-user (Astra Linux SE)
+  ansible.builtin.stat:
+    path: /usr/sbin/pdpl-user
+  register: _pdpl_bin
+
+- name: Security SUDO | Установка уровня целостности для субъектов SUDO (Astra Linux SE)
+  ansible.builtin.command:
+    argv:
+      - "{{ '/usr/sbin/pdpl-user' if item.type == 'user' else '/usr/sbin/pdpl-group' }}"
+      - -i
+      - "63"
+      - "{{ item.identity }}{{ '@' ~ item.sssd_suffix if (item.sssd | default(false)) else '' }}"
+  loop: "{{ _sudo_active_rules }}"
+  loop_control:
+    label: "{{ item.identity }}"
+  changed_when: false
+  when: _pdpl_bin.stat.exists

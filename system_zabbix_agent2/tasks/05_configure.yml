@@ -12,7 +12,7 @@
 - name: Zabbix Agent Conifg | Настройка прав Sudoers
   ansible.builtin.template:
     src: sudoers_zabbix.j2
-    dest: /etc/sudoers.d/zabbix_custom
+    dest: /etc/sudoers.d/20_zabbix_agent
     owner: root
     group: root
     mode: '0440'

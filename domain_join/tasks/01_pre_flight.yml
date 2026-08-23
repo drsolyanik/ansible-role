@@ -1,0 +1,57 @@
+---
+- name: Pre-flight | Проверка поддерживаемой операционной системы
+  ansible.builtin.assert:
+    that:
+      - (ansible_facts['os_family'] in ['Debian', 'Astra Linux']) or
+        (ansible_facts['distribution'] in ['Debian', 'Astra Linux'])
+    fail_msg: >-
+      Ошибка: Роль не может быть выполнена на этом сервере!
+      Текущая ОС: {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}).
+      Поддерживаемые дистрибутивы: Debian, Astra Linux.
+    success_msg: "ОС {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}) поддерживается роли."
+
+- name: Pre-flight | Подключение файла переменных на основе фактов ОС
+  ansible.builtin.include_vars: "{{ item }}"
+  with_first_found:
+    - files: "{{ ansible_facts['distribution'] | replace(' ', '_') }}.yml"
+      paths:
+        - "vars"
+
+- name: "Pre-flight | Пароль для доменного join не должен быть пустым"
+  ansible.builtin.assert:
+    that: 
+    - domain_join_password | length > 0
+    - domain_join_password is defined
+    fail_msg: "domain_join_password пуст или не определён! Используйте ansible-vault!"
+
+- name: Pre-flight | Проверка доменного суффикса
+  ansible.builtin.assert:
+    that: 
+      - domain_suffix | length > 0
+      - domain_suffix is regex('^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$')
+    fail_msg: "[CRITICAL]: Невалидный или пустой доменный суффикс!"
+
+- name: Pre-flight | DNS-запрос для A записи домена 
+  ansible.builtin.command: "getent ahosts {{ domain_suffix }}"
+  register: _dns_a_records
+  changed_when: false
+  failed_when: false
+
+- name: Pre-flight | Проверка доступности DNS имени
+  ansible.builtin.assert:
+    that:
+      - _dns_a_records.rc == 0
+      - _dns_a_records.stdout | length > 0
+    fail_msg: "[CRITICAL]: Не найдена запись A для доменного сервера {{ domain_suffix }}!"
+
+- name: Pre-flight | Проверка резолва SRV-записи Kerberos в DNS
+  ansible.builtin.command: "host -t SRV _kerberos._tcp.{{ domain_suffix }}"
+  register: _dns_kdc_check
+  changed_when: false
+  failed_when: false
+
+- name: Валидация DNS-резолва KDC
+  ansible.builtin.assert:
+    that:
+      - _dns_kdc_check.rc == 0
+    fail_msg: "[CRITICAL]: Запрос '_kerberos._tcp.{{ domain_suffix }}' вернул код {{ _dns_kdc_check.rc }}!"

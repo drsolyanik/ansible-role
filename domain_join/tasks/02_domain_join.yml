@@ -1,0 +1,35 @@
+---
+- name: Domain Join | Установка обязательных пакетов
+  ansible.builtin.apt:
+    name: "{{ _domain_join_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Domain Join | Проверка сервер уже в домене
+  ansible.builtin.command: "realm list"
+  register: realm_list
+  changed_when: false
+  failed_when: false
+
+- name: "Debug: verify password is not empty (REMOVE AFTER FIX)"
+  ansible.builtin.debug:
+    msg: "Password length: {{ domain_join_password | length }}"
+  no_log: false
+
+- name: Domain Join | Блок добавления в домен
+  when: domain_suffix not in realm_list.stdout
+  block:
+    - name: Domain Join | Добавление в домен через adcli
+      ansible.builtin.command: >
+        adcli join {{ domain_suffix }}
+        --login-user={{ domain_join_user }}
+        --stdin-password
+        --computer-ou={{ domain_join_ou | quote }}
+      args:
+        stdin: "{{ domain_join_password }}"
+#     no_log: true
+
+    - name: Domain Join | Выставляем флаг перезагрузки сервера
+      ansible.builtin.set_fact:
+        domain_join_reboot_required: true

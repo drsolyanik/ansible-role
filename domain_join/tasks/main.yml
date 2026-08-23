@@ -1,0 +1,5 @@
+---
+  - name: Domain Join | 01. Pre-flight валидация переменных и окружения
+    ansible.builtin.import_tasks: 01_pre_flight.yml
+  - name: Domain Join | 02. Подключение к домену
+    ansible.builtin.import_tasks: 02_domain_join.yml

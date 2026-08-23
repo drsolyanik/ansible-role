@@ -44,3 +44,9 @@
   ansible.builtin.command:
     cmd: sssctl config-check
   changed_when: false
+
+- name: Security SSSD | Включение сервиса SSSD
+  ansible.builtin.systemd:
+    name: sssd
+    enabled: true
+    state: started

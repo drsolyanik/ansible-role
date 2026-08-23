@@ -180,9 +180,3 @@
     that:
       - ansible_facts.services['sssd.service'] is defined
     fail_msg: "[CRITICAL]: Служба sssd.service не найдена в системе!"
-
-- name: Pre-flight | Проверка состояния SSSD
-  ansible.builtin.assert:
-    that:
-      - ansible_facts.services['sssd.service'].state == 'running'
-    fail_msg: "[CRITICAL]: Служба sssd.service не запущена!"

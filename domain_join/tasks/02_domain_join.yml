@@ -18,7 +18,7 @@
     - name: Domain Join | Добавление в домен через adcli
       ansible.builtin.command: >
         adcli join {{ domain_suffix }}
-        --login-user={{ domain_join_user | regex_replace('@.*', '') }}
+        --login-user={{ domain_join_user }}
         --stdin-password
         --computer-ou={{ domain_join_ou | quote }}
       args:

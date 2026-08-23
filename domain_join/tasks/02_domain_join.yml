@@ -28,7 +28,7 @@
         --computer-ou={{ domain_join_ou | quote }}
       args:
         stdin: "{{ domain_join_password }}"
-#     no_log: true
+      no_log: true
 
     - name: Domain Join | Выставляем флаг перезагрузки сервера
       ansible.builtin.set_fact:

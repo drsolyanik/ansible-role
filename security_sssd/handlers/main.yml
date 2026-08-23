@@ -1,0 +1,10 @@
+- name: Security SSSD | Restart SSSD
+  block:
+    - name: Security SSSD | Restart SSSD service
+      ansible.builtin.systemd:
+        name: sssd
+        state: restarted
+
+    - name: Security SSSD | Wait for SSSD
+      ansible.builtin.pause:
+        seconds: 30

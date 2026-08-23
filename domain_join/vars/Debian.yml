@@ -1,0 +1,11 @@
+---
+_domain_join_packages:
+  - realmd
+  - adcli
+  - krb5-user
+  - packagekit
+  - sssd 
+  - sssd-tools 
+  - libnss-sss 
+  - libpam-sss
+  - libsss-sudo

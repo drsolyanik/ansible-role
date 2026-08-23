@@ -1,0 +1,5 @@
+---
+domain_suffix: "domain.local"
+domain_join_user: "svc-linux-join"
+domain_join_ou: "OU=Linux Servers,OU=Servers,OU=DOMAIN,DC=domain,DC=local"
+domain_join_password: ""  # в vault

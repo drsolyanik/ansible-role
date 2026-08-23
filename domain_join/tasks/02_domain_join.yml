@@ -1,0 +1,49 @@
+---
+- name: Domain Join | Установка обязательных пакетов
+  ansible.builtin.apt:
+    name: "{{ _domain_join_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Domain Join | Проверка сервер уже в домене
+  ansible.builtin.command: "realm list"
+  register: realm_list
+  changed_when: false
+  failed_when: false
+
+- name: Domain Join | Блок добавления в домен
+  when: domain_suffix not in realm_list.stdout
+  block:
+    - name: Domain Join | Debain добавление в домен
+      ansible.builtin.expect:
+        command: >
+          realm join {{ domain_suffix }}
+          --user={{ domain_join_user | regex_replace('@.*', '') }}
+          --computer-ou={{ domain_join_ou | quote }}
+          --membership-software=adcli
+          --client-software=sssd
+          --automatic-id-mapping=yes
+        responses:
+          (?i)password: "{{ domain_join_password }}"
+      when: ansible_distribution == "Debian"
+      no_log: true
+
+    - name: Domain Join | Astra Linux добавление в домен
+      ansible.builtin.expect:
+        command: >
+          astra-ad-sssd-client 
+          -d {{ domain_suffix }} 
+          -u {{ domain_join_user }}
+          -fn 
+          --domdir-in-home 
+          -y
+          --par "--computer-ou={{ domain_join_ou }} --membership-software=adcli"
+        responses:
+          (?i)password: "{{ domain_join_password }}"
+      when: "'Astra' in ansible_distribution"
+      no_log: true
+
+    - name: Domain Join | Выставляем флаг перезагрузки сервера
+      ansible.builtin.set_fact:
+        domain_join_reboot_required: true

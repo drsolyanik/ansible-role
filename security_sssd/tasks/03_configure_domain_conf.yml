@@ -37,7 +37,8 @@
   loop_control:
     label: "{{ item }}"
   notify:
-    - Security SSSD | Restart SSSD
+    - Security SSSD | Restart SSSD service
+    - Security SSSD | Wait for SSSD
 
 - name: Security SSSD | Включение сервиса SSSD
   ansible.builtin.systemd:

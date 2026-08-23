@@ -19,8 +19,10 @@
 
 - name: "Pre-flight | Пароль для доменного join не должен быть пустым"
   ansible.builtin.assert:
-    that: domain_join_password | length > 0
-    fail_msg: "domain_join_password пуст! Используйте ansible-vault!"
+    that: 
+    - domain_join_password | length > 0
+    - domain_join_password is defined
+    fail_msg: "domain_join_password пуст или не определён! Используйте ansible-vault!"
 
 - name: Pre-flight | Проверка доменного суффикса
   ansible.builtin.assert:

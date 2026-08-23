@@ -40,7 +40,9 @@
           -y
           --par "--computer-ou={{ domain_join_ou }} --membership-software=adcli"
         responses:
-          (?i)password: "{{ domain_join_password }}"
+          (?i)[Pp]assword.*: "{{ domain_join_password }}"
+          (?i)[Пп]ароль.*: "{{ domain_join_password }}"
+        timeout: 300
       when: "'Astra' in ansible_distribution"
       no_log: true
 

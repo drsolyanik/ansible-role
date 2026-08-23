@@ -12,6 +12,11 @@
   changed_when: false
   failed_when: false
 
+- name: "Debug: verify password is not empty (REMOVE AFTER FIX)"
+  ansible.builtin.debug:
+    msg: "Password length: {{ domain_join_password | length }}"
+  no_log: false
+
 - name: Domain Join | Блок добавления в домен
   when: domain_suffix not in realm_list.stdout
   block:
@@ -21,9 +26,8 @@
         --login-user={{ domain_join_user }}
         --stdin-password
         --computer-ou={{ domain_join_ou | quote }}
-      args:
-        stdin: "{{ domain_join_password }}"
-#      no_log: true
+      stdin: "{{ domain_join_password }}"
+#     no_log: true
 
     - name: Domain Join | Выставляем флаг перезагрузки сервера
       ansible.builtin.set_fact:

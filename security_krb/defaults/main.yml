@@ -1,0 +1,22 @@
+---
+ssh_bastion_server: false
+domain_suffix: "domain.local"
+
+krb5_ccache_name: "KEYRING:persistent:%{uid}"
+krb5_ticket_lifetime: "24h"
+krb5_renew_lifetime: "7d"
+krb5_forwardable: "{{ (true if ssh_bastion_server else false) | bool }}"
+krb5_proxiable: false
+krb5_canonicalize: true
+krb5_rdns: false
+krb5_udp_preference_limit: 0
+krb5_dns_lookup_realm: false
+krb5_dns_lookup_kdc: true
+krb5_allow_weak_crypto: false
+krb5_k5login_authoritative: false
+
+krb5_kdc_host: ""          # например: "dc01.domain.local"
+krb5_admin_server: ""      # например: "dc01.domain.local"
+
+krb5_enctypes_hardening: false
+krb5_permitted_enctypes: "aes256-cts-hmac-sha1-96 aes128-cts-hmac-sha1-96"

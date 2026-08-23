@@ -36,14 +36,15 @@
   loop: "{{ _sssd_suffixes }}"
   loop_control:
     label: "{{ item }}"
-  notify:
-    - Security SSSD | Restart SSSD
-    - Security SSSD | Restart SSH
 
-- name: Security SSSD | Проверка конфигурации SSSD
-  ansible.builtin.command:
-    cmd: sssctl config-check
-  changed_when: false
+- name: Security SSSD | Перезапуст SSSD
+  ansible.builtin.systemd:
+    name: sssd
+    state: restarted
+
+- name: Security SSSD | Ожидание перезапуска SSSD
+  ansible.builtin.pause:
+    seconds: 
 
 - name: Security SSSD | Включение сервиса SSSD
   ansible.builtin.systemd:

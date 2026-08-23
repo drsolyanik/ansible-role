@@ -1,0 +1,5 @@
+---
+  - name: Security KRB5 | 01. Pre-flight валидация переменных и окружения
+    ansible.builtin.import_tasks: 01_pre_flight.yml
+  - name: Security KRB5 | 02. Настройка /etc/krb5.conf
+    ansible.builtin.import_tasks: 02_configure_krb5.yml

@@ -1,0 +1,106 @@
+---
+- name: Pre-flight | Проверка поддерживаемой операционной системы
+  ansible.builtin.assert:
+    that:
+      - (ansible_facts['os_family'] in ['Debian', 'Astra Linux']) or
+        (ansible_facts['distribution'] in ['Debian', 'Astra Linux'])
+    fail_msg: >-
+      Ошибка: Роль не может быть выполнена на этом сервере!
+      Текущая ОС: {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}).
+      Поддерживаемые дистрибутивы: Debian, Astra Linux.
+    success_msg: "ОС {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}) поддерживается роли."
+
+- name: Pre-flight | Проверка доменного суффикса
+  ansible.builtin.assert:
+    that: 
+      - domain_suffix | length > 0
+      - domain_suffix is regex('^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$')
+    fail_msg: "[CRITICAL]: Невалидный или пустой доменный суффикс!"
+
+- name: Pre-flight | DNS-запрос для A записи домена 
+  ansible.builtin.command: "getent ahosts {{ domain_suffix }}"
+  register: _dns_a_records
+  changed_when: false
+  failed_when: false
+
+- name: Pre-flight | Проверка доступности DNS имени
+  ansible.builtin.assert:
+    that:
+      - _dns_a_records.rc == 0
+      - _dns_a_records.stdout | length > 0
+    fail_msg: "[CRITICAL]: Не найдена запись A для доменного сервера {{ domain_suffix }}!"
+
+- name: Pre-flight | Проверка парамаетров /etc/krb5.conf
+  ansible.builtin.assert:
+    that: 
+      - ssh_bastion_server is boolean
+      - krb5_ccache_name is string
+      - krb5_ccache_name | length > 0
+      - krb5_ccache_name is regex('^(KEYRING|KCM|FILE|DIR|MEMORY):')
+      - krb5_ticket_lifetime is string
+      - krb5_ticket_lifetime is regex('^[0-9]+[smhd]$')
+      - krb5_renew_lifetime is string
+      - krb5_renew_lifetime is regex('^[0-9]+[smhd]$')
+      - krb5_forwardable is boolean
+      - krb5_proxiable is boolean
+      - krb5_canonicalize is boolean
+      - krb5_rdns is boolean
+      - krb5_udp_preference_limit is integer
+      - krb5_udp_preference_limit >= 0
+      - krb5_udp_preference_limit <= 32700
+      - krb5_dns_lookup_realm is boolean
+      - krb5_dns_lookup_kdc is boolean
+      - krb5_allow_weak_crypto is boolean
+      - krb5_k5login_authoritative is boolean
+      - krb5_kdc_host is string
+      - krb5_admin_server is string
+      - krb5_enctypes_hardening is boolean
+      - krb5_permitted_enctypes is string
+      - krb5_permitted_enctypes | length > 0
+    fail_msg: "[CRITICAL]: Невалидные парамаетры /etc/krb5.conf!"
+
+- name: Pre-flight | Парсинг lifetime в секунды
+  ansible.builtin.set_fact:
+    _ticket_seconds: "{{ krb5_ticket_lifetime | regex_replace('([0-9]+).*', '\\1') | int * 
+                        (1024 if 'w' in krb5_ticket_lifetime else 
+                         86400 if 'd' in krb5_ticket_lifetime else 
+                         3600 if 'h' in krb5_ticket_lifetime else 
+                         60 if 'm' in krb5_ticket_lifetime else 1) }}"
+    _renew_seconds: "{{ krb5_renew_lifetime | regex_replace('([0-9]+).*', '\\1') | int * 
+                       (1024 if 'w' in krb5_renew_lifetime else 
+                        86400 if 'd' in krb5_renew_lifetime else 
+                        3600 if 'h' in krb5_renew_lifetime else 
+                        60 if 'm' in krb5_renew_lifetime else 1) }}"
+
+- name: Pre-flight | Логика lifetime
+  ansible.builtin.assert:
+    that:
+      - _ticket_seconds | int <= _renew_seconds | int
+    fail_msg: "renew_lifetime должен быть >= ticket_lifetime!"
+
+- name: Pre-flight | Проверка kdc_host
+  ansible.builtin.assert:
+    that: krb5_kdc_host is regex('^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(?:\.(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))*$')
+    fail_msg: "Переменная krb5_kdc_host содержит недопустимое содержимое!"
+  when: krb5_kdc_host | length > 0
+
+- name: Pre-flight | Проверка KDC хоста
+  ansible.builtin.command: "getent ahosts {{ krb5_kdc_host }}"
+  register: _kdc_check
+  changed_when: false
+  failed_when: false
+  when: krb5_kdc_host | length > 0
+
+- name: Pre-flight | Валидация KDC
+  ansible.builtin.assert:
+    that:
+      - _kdc_check.rc == 0
+      - _kdc_check.stdout | length > 0
+    fail_msg: "KDC {{ krb5_kdc_host }} не резолвится!"
+  when: krb5_kdc_host | length > 0
+
+- name: Pre-flight | Проверка admin_server
+  ansible.builtin.assert:
+    that: krb5_admin_server is regex('^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(?:\.(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))*$')
+    fail_msg: "Переменная krb5_admin_server содержит недопустимое содержимое!"
+  when: krb5_admin_server | length > 0

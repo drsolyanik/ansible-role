@@ -12,11 +12,6 @@
   changed_when: false
   failed_when: false
 
-- name: "Debug: verify password is not empty (REMOVE AFTER FIX)"
-  ansible.builtin.debug:
-    msg: "Password length: {{ domain_join_password | length }}"
-  no_log: false
-
 - name: Domain Join | Блок добавления в домен
   when: domain_suffix not in realm_list.stdout
   block:

@@ -26,7 +26,8 @@
         --login-user={{ domain_join_user }}
         --stdin-password
         --computer-ou={{ domain_join_ou | quote }}
-      stdin: "{{ domain_join_password }}"
+      args:
+        stdin: "{{ domain_join_password }}"
 #     no_log: true
 
     - name: Domain Join | Выставляем флаг перезагрузки сервера

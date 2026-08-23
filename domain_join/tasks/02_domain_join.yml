@@ -15,34 +15,14 @@
 - name: Domain Join | Блок добавления в домен
   when: domain_suffix not in realm_list.stdout
   block:
-    - name: Domain Join | Debain добавление в домен
-      ansible.builtin.expect:
-        command: >
-          realm join {{ domain_suffix }}
-          --user={{ domain_join_user | regex_replace('@.*', '') }}
-          --computer-ou={{ domain_join_ou | quote }}
-          --membership-software=adcli
-          --client-software=sssd
-          --automatic-id-mapping=yes
-        responses:
-          (?i)password: "{{ domain_join_password }}"
-      when: ansible_distribution == "Debian"
-      no_log: true
-
-    - name: Domain Join | Astra Linux добавление в домен
-      ansible.builtin.expect:
-        command: >
-          astra-ad-sssd-client 
-          -d {{ domain_suffix }} 
-          -u {{ domain_join_user }}
-          -fn 
-          --domdir-in-home 
-          -y
-          --par "--computer-ou={{ domain_join_ou }} --membership-software=adcli"
-        responses:
-          (?i)[Pp]assword.*: "{{ domain_join_password }}"
-          (?i)[Пп]ароль.*: "{{ domain_join_password }}"
-        timeout: 300
+    - name: Domain Join | Добавление в домен через adcli
+      ansible.builtin.command: >
+        adcli join {{ domain_suffix }}
+        --login-user={{ domain_join_user | regex_replace('@.*', '') }}
+        --stdin-password
+        --computer-ou={{ domain_join_ou | quote }}
+      args:
+        stdin: "{{ domain_join_password }}"
       when: "'Astra' in ansible_distribution"
       no_log: true
 

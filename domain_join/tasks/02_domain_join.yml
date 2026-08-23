@@ -12,19 +12,39 @@
   changed_when: false
   failed_when: false
 
-- name: Domain Join | Блок добавления в домен
+- name: Domain Join | Добавление в домен через adcli
+  ansible.builtin.command: >
+    adcli join {{ domain_suffix }}
+    --login-user={{ domain_join_user }}
+    --stdin-password
+    --computer-ou={{ domain_join_ou | quote }}
+  args:
+    stdin: "{{ domain_join_password }}"
   when: domain_suffix not in realm_list.stdout
-  block:
-    - name: Domain Join | Добавление в домен через adcli
-      ansible.builtin.command: >
-        adcli join {{ domain_suffix }}
-        --login-user={{ domain_join_user }}
-        --stdin-password
-        --computer-ou={{ domain_join_ou | quote }}
-      args:
-        stdin: "{{ domain_join_password }}"
-      no_log: true
+  no_log: true
 
-    - name: Domain Join | Выставляем флаг перезагрузки сервера
-      ansible.builtin.set_fact:
-        domain_join_reboot_required: true
+- name: Domain Join | Вычисление FQDN
+  ansible.builtin.set_fact:
+    _domain_fqdn: "{{ ansible_hostname | regex_replace('\\.' + domain_suffix + '$', '') }}.{{ domain_suffix }}"
+
+- name: Domain Join | Установка FQDN hostname
+  ansible.builtin.hostname:
+    name: "{{ _domain_fqdn }}"
+  when: ansible_hostname != _domain_fqdn
+
+- name: Domain Join | Добавление FQDN в /etc/hosts
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^{{ ansible_default_ipv4.address | default(ansible_all_ipv4_addresses[0]) }}\s+.*'
+    line: "{{ ansible_default_ipv4.address | default(ansible_all_ipv4_addresses[0]) }} {{ _domain_fqdn }} {{ _domain_fqdn | regex_replace('\\.' + domain_suffix + '$', '') }}"
+    state: present
+    backup: true
+  when:
+    - ansible_default_ipv4.address is defined or ansible_all_ipv4_addresses | length > 0
+    - ansible_default_ipv4.address | default('') != '127.0.0.1'
+  ignore_errors: true
+
+- name: Domain Join | Выставляем флаг перезагрузки сервера
+  ansible.builtin.set_fact:
+    domain_join_reboot_required: true
+  when: domain_suffix not in realm_list.stdout

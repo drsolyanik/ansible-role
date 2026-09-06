@@ -18,7 +18,7 @@ auth        [success=1 default=ignore]  pam_localuser.so
 # Если домен подтвердил валидность пароля -> завершаем этап (done).
 # Если пользователя нет в домене (user_unknown) -> передаем управление дальше (ignore).
 # При неверном доменном пароле или просроченном аккаунте -> фиксируем сбой (bad).
-auth        [success=2 new_authtok_reqd=2 user_unknown=ignore default=bad]        pam_sss.so try_first_pass
+auth        [success=2 new_authtok_reqd=2 user_unknown=ignore default=bad]        pam_sss.so
 {% endif %}
 
 # Локальная аутентификация

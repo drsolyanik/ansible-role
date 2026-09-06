@@ -1,3 +1,4 @@
+---
 - name: Zabbix Agent | Сбор информации о пакетах
   ansible.builtin.package_facts:
     manager: auto

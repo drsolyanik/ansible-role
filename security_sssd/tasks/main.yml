@@ -1,7 +1,7 @@
 ---
-  - name: Security PAM SSH | 01. Pre-flight валидация переменных и окружения
-    ansible.builtin.import_tasks: 01_pre_flight.yml
-  - name: Security PAM SSH | 02. Настройка /etc/sssd/sssd.conf
-    ansible.builtin.import_tasks: 02_configure_sssd_conf.yml
-  - name: Security PAM SSH | 03. Настройка доменных конфигов SSSD
-    ansible.builtin.import_tasks: 03_configure_domain_conf.yml
+- name: Security PAM SSH | 01. Pre-flight валидация переменных и окружения
+  ansible.builtin.import_tasks: 01_pre_flight.yml
+- name: Security PAM SSH | 02. Настройка /etc/sssd/sssd.conf
+  ansible.builtin.import_tasks: 02_configure_sssd_conf.yml
+- name: Security PAM SSH | 03. Настройка доменных конфигов SSSD
+  ansible.builtin.import_tasks: 03_configure_domain_conf.yml

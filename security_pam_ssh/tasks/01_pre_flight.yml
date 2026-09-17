@@ -132,7 +132,7 @@
       ansible.builtin.command: "getent ahosts {{ domain_suffix }}"
       register: _dns_a_records
       changed_when: false
-      ignore_errors: true
+      failed_when: false
 
     - name: Pre-flight | Проверка доступности DNS имени
       ansible.builtin.assert:

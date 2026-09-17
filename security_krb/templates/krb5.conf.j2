@@ -1,0 +1,38 @@
+# {{ ansible_managed }}
+# Managed by Ansible Role: security_krb
+
+[libdefaults]
+    default_realm = {{ domain_suffix | upper }}
+    default_ccache_name = {{ krb5_ccache_name }}
+    ticket_lifetime = {{ krb5_ticket_lifetime }}
+    renew_lifetime = {{ krb5_renew_lifetime }}
+    forwardable = {{ krb5_forwardable | lower }}
+    proxiable = {{ krb5_proxiable | lower }}
+    canonicalize = {{ krb5_canonicalize | lower }}
+    rdns = {{ krb5_rdns | lower }}
+    udp_preference_limit = {{ krb5_udp_preference_limit }}
+    dns_lookup_realm = {{ krb5_dns_lookup_realm | lower }}
+    dns_lookup_kdc = {{ krb5_dns_lookup_kdc | lower }}
+    allow_weak_crypto = {{ krb5_allow_weak_crypto | lower }}
+    k5login_authoritative = {{ krb5_k5login_authoritative | lower }}
+
+{% if krb5_enctypes_hardening %}
+    permitted_enctypes = {{ krb5_permitted_enctypes }}
+{% endif %}
+
+[realms]
+    {{ domain_suffix | upper }} = {
+        auth_to_local = RULE:[1:$1@$0](.*@{{ domain_suffix | upper }})s/@{{ domain_suffix | upper }}/@{{ domain_suffix }}/
+        auth_to_local = DEFAULT
+        default_domain = {{ domain_suffix }}
+{% if krb5_kdc_host | length > 0 %}
+        kdc = {{ krb5_kdc_host }}
+{% endif %}
+{% if krb5_admin_server | length > 0 %}
+        admin_server = {{ krb5_admin_server }}
+{% endif %}
+    }
+
+[domain_realm]
+    {{ domain_suffix }} = {{ domain_suffix | upper }}
+    .{{ domain_suffix }} = {{ domain_suffix | upper }}

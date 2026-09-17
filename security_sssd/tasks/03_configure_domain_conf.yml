@@ -37,13 +37,8 @@
   loop_control:
     label: "{{ item }}"
   notify:
-    - Security SSSD | Restart SSSD
-    - Security SSSD | Restart SSH
-
-- name: Security SSSD | Проверка конфигурации SSSD
-  ansible.builtin.command:
-    cmd: sssctl config-check
-  changed_when: false
+    - Security SSSD | Restart SSSD service
+    - Security SSSD | Wait for SSSD
 
 - name: Security SSSD | Включение сервиса SSSD
   ansible.builtin.systemd:

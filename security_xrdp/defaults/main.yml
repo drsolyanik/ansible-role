@@ -1,0 +1,61 @@
+pam_xrdp_backup_count: 3
+
+access_profiles_default: {}
+access_profiles_extra: {}
+
+xrdp_access_rules: >-
+  {{
+    access_profiles_default
+    | combine(
+        access_profiles_extra,
+        recursive=true
+      )
+  }}
+
+domain_joined: false
+
+xrdp_required_packages:
+  - xrdp
+  - xorgxrdp
+  - fly-wm
+
+# Хэширование: yescrypt для современных Deb/Astra (glibc 2.35+)
+pam_xrdp_password_hash: "yescrypt" # Более старая альтернатива "sha512"
+
+# ==============================================================================
+# ACCESS CONTROL
+# ==============================================================================
+pam_xrdp_access_file: "/etc/security/access-xrdp.conf"
+pam_xrdp_access_deny_all: true
+
+# ==============================================================================
+# MKHOMEDIR
+# ==============================================================================
+pam_xrdp_mkhomedir_enable: true
+pam_xrdp_mkhomedir_umask: "0077"
+pam_xrdp_mkhomedir_skel: "/etc/skel"
+
+# ==============================================================================
+# FAILLOCK
+# ==============================================================================
+pam_xrdp_faillock_enable: true
+pam_xrdp_faillock_deny: 5
+pam_xrdp_faillock_unlock_time: 900
+
+# ==============================================================================
+# Limitations XRDP
+# ==============================================================================
+xrdp_max_sessions: 50
+xrdp_idle_time_limit: 32400          # 9 часов
+xrdp_disconnected_time_limit: 604800 # 7 дней
+xrdp_kill_disconnected: true 
+
+# ==============================================================================
+# FLY WM
+# ==============================================================================
+fly_wm_low_perf_mod: true
+fly_wm_disable_lock: true
+fly_wm_wireframe_windows: true
+fly_wm_disable_animations: true
+fly_wm_solid_background: true
+fly_wm_solid_intarface: true

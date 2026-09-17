@@ -1,0 +1,100 @@
+---
+- name: Pre-flight | Проверка файла themerc Fly WM
+  ansible.builtin.stat:
+    path: /usr/share/fly-wm/theme.master/themerc
+  register: _fly_themerc_stat
+
+- name: Pre-flight | Проверка существования themerc
+  ansible.builtin.assert:
+    that:
+      - _fly_themerc_stat.stat.exists
+      - _fly_themerc_stat.stat.isreg
+    fail_msg: "[CRITICAL]: Файл /usr/share/fly-wm/theme.master/themerc не найден!"
+
+- name: Security Fly WM | Отключить блокировку экрана и скринсейвер экрана
+  community.general.ini_file:
+    path: /usr/share/fly-wm/theme.master/themerc
+    section: Variables
+    option: "LowPerf"
+    value: "true"
+    mode: '0644'
+    backup: true
+  when: fly_wm_low_perf_mod | default(true) | bool
+
+- name: Security Fly WM | Отключить блокировку экрана и скринсейвер экрана
+  community.general.ini_file:
+    path: /usr/share/fly-wm/theme.master/themerc
+    section: Variables
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+    mode: '0644'
+    backup: true
+  loop:
+    - { option: 'ScreenSaverDelay', value: '0' }
+    - { option: 'LockerDpmsOffTimeout', value: '0' }
+    - { option: 'LockerOnSleep', value: 'false' }
+    - { option: 'LockerOnDPMS', value: 'false' }
+    - { option: 'LockerOnLid', value: 'false' }
+    - { option: 'LockerOnSwitch', value: 'false' }
+  when: fly_wm_disable_lock | default(true) | bool
+
+- name: Security Fly WM | Включить контурную отрисовку при перемещении окон
+  community.general.ini_file:
+    path: /usr/share/fly-wm/theme.master/themerc
+    section: Variables
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+    mode: '0644'
+    backup: true
+  loop:
+    - { option: 'OpaqueMove', value: 'false' }
+    - { option: 'OpaqueResize', value: 'false' }
+  when: fly_wm_wireframe_windows | default(true) | bool
+
+- name: Security Fly WM | Отключить анимации
+  community.general.ini_file:
+    path: /usr/share/fly-wm/theme.master/themerc
+    section: Variables
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+    mode: '0644'
+    backup: true
+  loop:
+    - { option: 'StartMenuMapSpeed', value: '0' }
+    - { option: 'GradWindowMapSpeed', value: '0' }
+    - { option: 'PagerMapSpeed', value: '0' }
+    - { option: 'PagerMapStyle', value: 'Normal' }
+    - { option: 'OnScreenEffectExit', value: '0' }
+    - { option: 'OnScreenEffectSwitcher', value: '0' }
+    - { option: 'ThumbSize', value: '0' }
+  when: fly_wm_disable_animations | default(true) | bool
+
+- name: Security Fly WM | Настроить упрощение цветов и тем
+  community.general.ini_file:
+    path: /usr/share/fly-wm/theme.master/themerc
+    section: Variables
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+    mode: '0644'
+    backup: true
+  loop:
+    - { option: 'Wallpaper', value: '"#3a6ea5"' }
+    - { option: 'MenuColor', value: '"#9dc9d1"' }
+    - { option: 'MenuColor2', value: '"#9dc9d1"' }
+    - { option: 'DecorTheme', value: '""' }
+    - { option: 'IconOverEffect', value: '1.0' }
+  when: fly_wm_solid_background | default(true) | bool
+
+- name: Security Fly WM | Настроить упрощенный интерфейс
+  community.general.ini_file:
+    path: /usr/share/fly-wm/theme.master/themerc
+    section: Variables
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+    mode: '0644'
+    backup: true
+  loop:
+    - { option: 'UseStartButton', value: 'true' }
+    - { option: 'UsePager', value: 'false' }
+    - { option: 'UseInotify', value: 'false' }
+  when: fly_wm_solid_intarface | default(true) | bool

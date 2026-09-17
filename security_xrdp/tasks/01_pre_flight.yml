@@ -1,0 +1,174 @@
+---
+- name: Pre-flight | Проверка поддерживаемой операционной системы
+  ansible.builtin.assert:
+    that:
+      - (ansible_facts['os_family'] in ['Astra Linux']) or
+        (ansible_facts['distribution'] in ['Astra Linux'])
+    fail_msg: >-
+      Ошибка: Роль не может быть выполнена на этом сервере!
+      Текущая ОС: {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}).
+      Поддерживаемые дистрибутивы: Astra Linux.
+    success_msg: "ОС {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}) поддерживается роли."
+
+- name: Pre-flight | Предупреждение об отключённом PAM модуле
+  ansible.builtin.debug:
+    msg: "[WARNING]: PAM модуль отключен! Критическая уязвимость! Данная опция подходит только для тестирования!"
+  when: not (pam_xrdp_access_deny_all | default(true) | bool)
+
+- name: Pre-flight | Проверка обязательных параметров роли
+  ansible.builtin.assert:
+    that:
+      - pam_xrdp_access_deny_all is boolean
+      - domain_joined is boolean
+      - pam_xrdp_mkhomedir_enable is boolean
+      - pam_xrdp_faillock_enable is boolean
+      - pam_xrdp_backup_count is integer
+      - pam_xrdp_backup_count > 0
+    fail_msg: "[CRITICAL]: Ошибка в обязательных параметрах роли!"
+
+- name: Pre-flight | Проверка указанных параметров для PAM модуля
+  ansible.builtin.assert:
+    that:
+      - pam_xrdp_password_hash in ['yescrypt', 'sha512']
+      - pam_xrdp_access_file | length > 0 and pam_xrdp_access_file is regex('^/')
+    fail_msg: "[CRITICAL]: Ошибка в заданных параметрах PAM RDP!"
+
+- name: Pre-flight | Определить активные RDP-правила с учетом доменного статуса
+  ansible.builtin.set_fact:
+    _pam_xrdp_active_rules: >-
+      {{
+        xrdp_access_rules.values()
+        | selectattr('rdp', 'defined')
+        | selectattr('rdp')
+        | rejectattr('source', 'equalto', 'domain')
+        | list
+        +
+        (
+          xrdp_access_rules.values()
+          | selectattr('rdp', 'defined')
+          | selectattr('rdp')
+          | selectattr('source', 'equalto', 'domain')
+          | list
+          if domain_joined | default(false)
+          else []
+        )
+      }}
+
+- name: Pre-flight | Проверка наличия активных RDP-правил
+  ansible.builtin.assert:
+    that: 
+      - _pam_xrdp_active_rules is defined
+      - _pam_xrdp_active_rules | length > 0
+    fail_msg: "[CRITICAL]: Список активных RDP-правил пуст!"
+
+- name: Pre-flight | Проверка активные RDP-правил
+  ansible.builtin.assert:
+    that:
+      - (item.type == 'user' and item.identity is regex('^[a-zA-Z0-9_.-]+$')) or ( item.type == 'group' and item.identity is regex('^[a-zA-Z0-9_. -]+$'))
+      - item.identity | length > 0
+      - item.type in ['user', 'group']
+      - item.source in ['local', 'domain']
+    fail_msg: "[CRITICAL]: Ошибка в списке активных RDP-правил!"
+  loop: "{{ _pam_xrdp_active_rules }}"
+
+- name: Pre-flight | Проверка параметров временной блокировки
+  ansible.builtin.assert:
+    that: 
+      - pam_xrdp_faillock_deny > 0
+      - pam_xrdp_faillock_deny is integer
+      - pam_xrdp_faillock_unlock_time >= 60
+      - pam_xrdp_faillock_unlock_time is integer
+    fail_msg: "[CRITICAL]: Не настроены параметры временной блокировки!"
+  when: pam_xrdp_faillock_enable | default(true) | bool
+
+- name: Pre-flight | Сбор фактов о пакетах
+  ansible.builtin.package_facts:
+    manager: apt
+
+- name: Pre-flight | Проверка обязательных пакетов
+  ansible.builtin.assert:
+    that:
+      - item in ansible_facts.packages
+    fail_msg: "[CRITICAL]: Отсутствует обязательный пакет: {{ item }}"
+  loop: "{{ xrdp_required_packages }}"
+
+#################################################################
+# ПРОВЕРКИ ДОМЕННЫХ ПАРАМЕТРОВ
+#################################################################
+- name: Pre-flight | Проверка доменных параметров модуля PAM
+  when: domain_joined | default(false) | bool
+  block:
+    - name: Pre-flight | Проверка SSSD suffix в правилах доменного доступа
+      ansible.builtin.assert:
+        that:
+          - item.sssd_suffix is defined
+          - item.sssd_suffix is string
+          - item.sssd_suffix | length > 0
+          - item.sssd_suffix is regex('^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)+$')
+        fail_msg: >-
+          [CRITICAL]: Для SSSD-правила "{{ item.identity }}"
+          не указан обязательный параметр sssd_suffix!
+      loop: "{{ _pam_xrdp_active_rules }}"
+      loop_control:
+        label: "{{ item.identity }}"
+      when:
+        - item.sssd | default(false) | bool
+
+    - name: Pre-flight | Проверка типов доменных RDP-правил
+      ansible.builtin.assert:
+        that:
+          - item.type == 'group'
+        fail_msg: >-
+          [CRITICAL]: Для доменного RDP-правила
+          "{{ item.identity }}" тип должен быть "group",
+          получено: "{{ item.type }}"
+      loop: "{{ _pam_xrdp_active_rules }}"
+      when: item.source == 'domain'
+
+#################################################################
+# ПРОВЕРКИ ПАРАМЕТРОВ ДОМАШНЕЙ ДИРЕКТОРИИ
+#################################################################
+- name: Pre-flight | Проверка параметров домашней директории
+  when: pam_xrdp_mkhomedir_enable | default(false) | bool
+  block:
+    - name: Pre-flight | Проверка skel
+      ansible.builtin.stat:
+        path: "{{ pam_xrdp_mkhomedir_skel }}"
+      register: _pam_skel_stat
+
+    - name: Pre-flight | Проверка существования skel
+      ansible.builtin.assert:
+        that:
+          - _pam_skel_stat.stat.exists
+          - _pam_skel_stat.stat.isdir
+        fail_msg: "[CRITICAL]: Директория skel {{ pam_xrdp_mkhomedir_skel }} не существует!"
+
+    - name: Pre-flight | Проверка umask домашней директории
+      ansible.builtin.assert:
+        that:
+          - pam_xrdp_mkhomedir_umask is regex('^0[0-7]{3}$')
+          - pam_xrdp_mkhomedir_umask in ['0077', '0027']
+        fail_msg: "[CRITICAL]: umask {{ pam_xrdp_mkhomedir_umask }} невалидный или слишком открытый!"
+
+- name: Pre-flight | Проверка лимитов XRDP
+  ansible.builtin.assert:
+    that: 
+      - xrdp_max_sessions > 0
+      - xrdp_max_sessions is integer
+      - xrdp_idle_time_limit >= 60
+      - xrdp_idle_time_limit is integer
+      - xrdp_disconnected_time_limit > xrdp_idle_time_limit
+      - xrdp_disconnected_time_limit is integer
+      - xrdp_kill_disconnected is boolean
+    fail_msg: "[CRITICAL]: Неправильно настроены параметры лимитов XRDP!"
+
+- name: Pre-flight | Проверка параметров оболочки Fly WM
+  ansible.builtin.assert:
+    that: 
+      - fly_wm_low_perf_mod is boolean
+      - fly_wm_disable_lock is boolean
+      - fly_wm_wireframe_windows is boolean
+      - fly_wm_disable_animations is boolean
+      - fly_wm_solid_background is boolean
+      - fly_wm_solid_intarface is boolean
+    fail_msg: "[CRITICAL]: Неправильно настроены параметры оболочки Fly WM!"

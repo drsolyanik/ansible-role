@@ -1,0 +1,35 @@
+---
+- name: Security XRDP | Делегировать контроль доступа XRDP в PAM
+  community.general.ini_file:
+    path: /etc/xrdp/sesman.ini
+    section: Security
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+    mode: '0644'
+    backup: true
+  loop:
+    - { option: 'TerminalServerUsers', value: '' }
+    - { option: 'TerminalServerAdmins', value: '' }
+    - { option: 'AlwaysGroupCheck', value: 'False' }
+  notify: Security XRDP | Restart xrdp-sesman
+
+- name: Security XRDP | Настроить лимиты сессий xRDP в sesman.ini
+  community.general.ini_file:
+    path: /etc/xrdp/sesman.ini
+    section: Sessions
+    option: "{{ item.option }}"
+    value: "{{ item.value }}"
+    mode: '0644'
+    backup: true
+  loop:
+    - { option: 'MaxSessions', value: "{{ xrdp_max_sessions }}" }
+    - { option: 'IdleTimeLimit', value: "{{ xrdp_idle_time_limit }}" }
+    - { option: 'DisconnectedTimeLimit', value: "{{ xrdp_disconnected_time_limit }}" }
+    - { option: 'KillDisconnected', value: "{{ xrdp_kill_disconnected }}" }
+  notify: Security XRDP | Restart xrdp-sesman
+
+- name: Security XRDP | Проверка статуса XRDP
+  ansible.builtin.systemd:
+    name: xrdp-sesman.service
+    state: started
+    enabled: true

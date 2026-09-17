@@ -1,0 +1,28 @@
+---
+- name: Security PAM XRDP | Настройка /etc/pam.d/xrdp-sesman
+  ansible.builtin.template:
+    src: xrdp-sesman.j2
+    dest: "/etc/pam.d/xrdp-sesman"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  register: _xrdp_pam_result
+
+- name: Security PAM XRDP | Очистка старых бэкапов /etc/pam.d/xrdp-sesman
+  block:
+    - name: Security PAM XRDP | Поиск всех бэкапов /etc/pam.d/xrdp-sesman
+      ansible.builtin.find:
+        paths: "/etc/pam.d"
+        patterns: "xrdp-sesman.*~"
+      register: _backups_xrdp_pam
+
+    - name: Security PAM XRDP | Удаление бэкапов кроме последних {{ pam_xrdp_backup_count }} 
+      ansible.builtin.file:
+        path: "{{ backup_item.path }}"
+        state: absent
+      loop: "{{ (_backups_xrdp_pam.files | sort(attribute='mtime', reverse=true))[pam_xrdp_backup_count|int:] }}"
+      when: _backups_xrdp_pam.files | length > pam_xrdp_backup_count | int
+      loop_control:
+        loop_var: backup_item
+  when: _xrdp_pam_result is changed

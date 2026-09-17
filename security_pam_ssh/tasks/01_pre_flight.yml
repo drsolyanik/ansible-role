@@ -20,8 +20,10 @@
     that:
       - pam_ssh_password_hash in ['yescrypt', 'sha512']
       - pam_ssh_access_file | length > 0 and pam_ssh_access_file is regex('^/')
-      - pam_ssh_password_remember | int > 0
-      - pam_ssh_backup_count | int > 0
+      - pam_ssh_password_remember is integer
+      - pam_ssh_password_remember > 0
+      - pam_ssh_backup_count is integer
+      - pam_ssh_backup_count > 0
     fail_msg: "[CRITICAL]: Ошибка в заданных параметрах PAM SSH!"
 
 - name: Pre-flight | Определить активные SSH-правила с учетом доменного статуса

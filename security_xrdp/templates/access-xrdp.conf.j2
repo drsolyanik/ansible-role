@@ -1,0 +1,26 @@
+# {{ ansible_managed }}
+# Managed by Ansible Role: security_xrdp
+
+# =========================================
+# XRDP ACCESS CONTROL CONFIGURATION
+# =========================================
+
+{% for entry in _pam_xrdp_active_rules %}
+{% if entry.rdp %}
+# {{ entry.description }}
+{% if entry.source == "local" %}
+{% if entry.type == "user" %}
++ : {{ entry.identity }} : {{ entry.rdp_origin }}
+{% elif entry.type == "group" %}
++ : ({{ entry.identity }}) : {{ entry.rdp_origin }}
+{% endif %}
+{% elif entry.source == "domain" %}
++ : ({{ entry.identity }}@{{ entry.sssd_suffix }}) : {{ entry.rdp_origin }}
+{% endif %}
+{% endif %}
+
+{% endfor %}
+{% if pam_xrdp_access_deny_all | default(true) | bool %}
+# Запрет для всех остальных
+- : ALL : ALL
+{% endif %}

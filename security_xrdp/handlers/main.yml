@@ -1,0 +1,4 @@
+- name: Security XRDP | Restart xrdp-sesman
+  ansible.builtin.systemd:
+    name: xrdp-sesman
+    state: restarted

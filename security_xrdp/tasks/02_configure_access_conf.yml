@@ -1,0 +1,28 @@
+---
+- name: Security PAM XRDP | Настройка {{ pam_xrdp_access_file }}
+  ansible.builtin.template:
+    src: access-xrdp.conf.j2
+    dest: "{{ pam_xrdp_access_file }}"
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  register: _access_conf_result
+
+- name: Security PAM XRDP | Очистка старых бэкапов {{ pam_xrdp_access_file }}
+  block:
+    - name: Security PAM XRDP | Поиск всех бэкапов {{ pam_xrdp_access_file }}
+      ansible.builtin.find:
+        paths: "{{ pam_xrdp_access_file | dirname }}"
+        patterns: "{{ pam_xrdp_access_file | basename }}.*~"
+      register: _backups_access_conf
+
+    - name: Security PAM XRDP | Удаление бэкапов кроме последних {{ pam_xrdp_backup_count }} 
+      ansible.builtin.file:
+        path: "{{ backup_item.path }}"
+        state: absent
+      loop: "{{ (_backups_access_conf.files | sort(attribute='mtime', reverse=true))[pam_xrdp_backup_count|int:] }}"
+      when: _backups_access_conf.files | length > pam_xrdp_backup_count | int
+      loop_control:
+        loop_var: backup_item
+  when: _access_conf_result is changed

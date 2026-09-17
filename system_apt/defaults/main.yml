@@ -100,6 +100,8 @@ apt_allowed_option_keys:
   - Signed-By
 
 apt_default_packages:
+  - procps
+  - util-linux
   - ca-certificates
   - curl
   - gnupg

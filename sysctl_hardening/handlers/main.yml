@@ -1,0 +1,8 @@
+---
+- name: Apply sysctl settings
+  ansible.builtin.command: sysctl --system
+  register: sysctl_result
+  failed_when:
+    - sysctl_result.rc != 0
+    - not sysctl_hardening_ignore_unknown_keys
+  changed_when: true

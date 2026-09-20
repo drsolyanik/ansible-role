@@ -1,0 +1,12 @@
+---
+- name: Sysctl Hardening | 01. Pre-flight валидация переменных и окружения
+  ansible.builtin.import_tasks: 01_pre_flight.yml
+
+- name: Sysctl Hardening | Развертывание шаблона конфигурации безопасности sysctl
+  ansible.builtin.template:
+    src: 99-sysctl-hardening.conf.j2
+    dest: /etc/sysctl.d/99-kernel-hardening.conf
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Apply sysctl settings

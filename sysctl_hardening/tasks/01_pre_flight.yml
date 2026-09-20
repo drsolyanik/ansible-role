@@ -1,0 +1,67 @@
+---
+- name: Pre-flight | Проверка поддерживаемой операционной системы
+  ansible.builtin.assert:
+    that:
+      - (ansible_facts['os_family'] in ['Debian', 'Astra Linux']) or
+        (ansible_facts['distribution'] in ['Debian', 'Astra Linux'])
+    fail_msg: >-
+      Ошибка: Роль не может быть выполнена на этом сервере!
+      Текущая ОС: {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}).
+      Поддерживаемые дистрибутивы: Debian, Astra Linux.
+    success_msg: "ОС {{ ansible_facts['distribution'] }} (Семейство: {{ ansible_facts['os_family'] }}) поддерживается роли."
+
+- name: Pre-flight | Проверка обязательных параметров роли
+  ansible.builtin.assert:
+    that:
+      - sysctl_hardening_ignore_unknown_keys is boolean
+    fail_msg: "[CRITICAL]: Ошибка в обязательных параметрах роли!"
+
+- name: Pre-flight | Проверка BPF и Memory Security параметров роли
+  ansible.builtin.assert:
+    that:
+      - sysctl_net_core_bpf_jit_harden is integer
+      - sysctl_net_core_bpf_jit_harden in [0, 1, 2]
+      - sysctl_vm_mmap_min_addr is integer
+      - sysctl_vm_mmap_min_addr >= 0
+      - sysctl_vm_unprivileged_userfaultfd is integer
+      - sysctl_vm_unprivileged_userfaultfd in [0, 1]
+    fail_msg: "[CRITICAL]: Ошибка в BPF и Memory Security параметрах роли!"
+
+- name: Pre-flight | Проверка Kernel и Restrict Security параметров роли
+  ansible.builtin.assert:
+    that:
+      - sysctl_kernel_dmesg_restrict is integer
+      - sysctl_kernel_dmesg_restrict in [0, 1]
+      - sysctl_kernel_kptr_restrict is integer
+      - sysctl_kernel_kptr_restrict in [0, 1, 2]
+      - sysctl_kernel_perf_event_paranoid is integer
+      - sysctl_kernel_perf_event_paranoid in [-1, 0, 1, 2, 3]
+      - sysctl_kernel_unprivileged_bpf_disabled is integer
+      - sysctl_kernel_unprivileged_bpf_disabled in [0, 1, 2]
+      - sysctl_kernel_randomize_va_space is integer
+      - sysctl_kernel_randomize_va_space in [0, 1, 2]
+      - sysctl_kernel_yama_ptrace_scope is integer
+      - sysctl_kernel_yama_ptrace_scope in [0, 1, 2, 3]
+    fail_msg: "[CRITICAL]: Ошибка в Kernel и Restrict Security параметрах роли!"
+
+- name: Pre-flight | Проверка TTY Security параметров роли
+  ansible.builtin.assert:
+    that:
+      - sysctl_dev_tty_legacy_tiocsti is integer
+      - sysctl_dev_tty_legacy_tiocsti in [0, 1]
+    fail_msg: "[CRITICAL]: Ошибка в TTY Security параметрах роли!"
+
+- name: Pre-flight | Проверка FS Protection параметров роли
+  ansible.builtin.assert:
+    that:
+      - sysctl_fs_protected_symlinks is integer
+      - sysctl_fs_protected_symlinks in [0, 1]
+      - sysctl_fs_protected_hardlinks is integer
+      - sysctl_fs_protected_hardlinks in [0, 1]
+      - sysctl_fs_protected_fifos is integer
+      - sysctl_fs_protected_fifos in [0, 1, 2]
+      - sysctl_fs_protected_regular is integer
+      - sysctl_fs_protected_regular in [0, 1, 2]
+      - sysctl_fs_suid_dumpable is integer
+      - sysctl_fs_suid_dumpable in [0, 1, 2, 3]
+    fail_msg: "[CRITICAL]: Ошибка в FS Protection параметрах роли!"

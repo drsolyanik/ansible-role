@@ -1,0 +1,26 @@
+---
+# Флаг игнорирования ошибок при отсутствии параметра в старх версиях ядер
+sysctl_hardening_ignore_unknown_keys: true
+
+# BPF & Memory Security
+sysctl_net_core_bpf_jit_harden: 2
+sysctl_vm_mmap_min_addr: 65536
+sysctl_vm_unprivileged_userfaultfd: 0
+
+# Kernel & Restrict Security
+sysctl_kernel_dmesg_restrict: 1
+sysctl_kernel_kptr_restrict: 2
+sysctl_kernel_perf_event_paranoid: 3
+sysctl_kernel_unprivileged_bpf_disabled: 2
+sysctl_kernel_randomize_va_space: 2
+sysctl_kernel_yama_ptrace_scope: 2
+
+# TTY Security
+sysctl_dev_tty_legacy_tiocsti: 0
+
+# File System Protection
+sysctl_fs_protected_symlinks: 1
+sysctl_fs_protected_hardlinks: 1
+sysctl_fs_protected_fifos: 2
+sysctl_fs_protected_regular: 2
+sysctl_fs_suid_dumpable: 0

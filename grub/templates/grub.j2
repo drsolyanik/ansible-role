@@ -1,6 +1,12 @@
 # {{ ansible_managed }}
 # Managed by Ansible Role: grub
 
+{% macro render_cmdline(params_dict) %}
+{%- for k, v in params_dict.items() -%}
+  {{ k }}{{ ('=' ~ v) if v is not none and v | string != '' else '' }}{{ ' ' if not loop.last else '' }}
+{%- endfor -%}
+{% endmacro %}
+
 # ------------------------------------------------------------------------------
 # 1. ЛОГИКА ВЫБОРА ЯДРА И ПОВЕДЕНИЕ МЕНЮ
 # ------------------------------------------------------------------------------
@@ -11,22 +17,23 @@ GRUB_SAVEDEFAULT=false
 GRUB_DISABLE_SUBMENU=y
 GRUB_TIMEOUT_STYLE=menu
 GRUB_RECORDFAIL_TIMEOUT=10
+
 # ------------------------------------------------------------------------------
 # 2. ПАРАМЕТРЫ ЗАПУСКА ЯДРА
 # ------------------------------------------------------------------------------
-GRUB_CMDLINE_LINUX="panic=10"
+GRUB_CMDLINE_LINUX="{{ render_cmdline(grub_final_cmdline_linux) }}"
+GRUB_CMDLINE_LINUX_DEFAULT="{{ render_cmdline(grub_final_cmdline_default) }}"
 {% if ansible_facts['distribution'] == 'Astra Linux' %}
-{{ default_line | default('GRUB_CMDLINE_LINUX_DEFAULT="quiet parsec.max_ilev=0 parsec.mac=0"') }}
-{{ hardened_line | default('GRUB_CMDLINE_LINUX_HARDENED="slub_debug=P page_poison=1 slab_nomerge pti=on user.max_user_namespaces=0 kernel.kptr_restrict=1 vsyscall=none"') }}
-{% else %}
-GRUB_CMDLINE_LINUX_DEFAULT=""
+GRUB_CMDLINE_LINUX_HARDENED="{{ render_cmdline(grub_final_cmdline_hardened) }}"
 {% endif %}
+
 # ------------------------------------------------------------------------------
 # 3. НАСТРОЙКА ИНТЕРФЕЙСА И ВЫВОДА GRUB
 # ------------------------------------------------------------------------------
 GRUB_TERMINAL=console
 GRUB_GFXMODE=1024x768
 GRUB_GFXPAYLOAD_LINUX=text
+
 # ------------------------------------------------------------------------------
 # 4. БЕЗОПАСНОСТЬ И ОПТИМИЗАЦИЯ СБОРКИ КОНФИГА
 # ------------------------------------------------------------------------------

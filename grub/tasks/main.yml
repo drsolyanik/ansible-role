@@ -1,38 +1,50 @@
-- name: GRUB | Прочитать файл /etc/default/grub
+---
+- name: GRUB | Проверить наличие /etc/default/grub
+  ansible.builtin.stat:
+    path: /etc/default/grub
+  register: grub_file_stat
+
+- name: GRUB | Прочитать существующий /etc/default/grub
   ansible.builtin.slurp:
     src: /etc/default/grub
   register: grub_content
+  when: grub_file_stat.stat.exists
 
-- name: GRUB | Декодировать файл /etc/default/grub
+- name: GRUB | Подготовить итоговые словари параметров
   ansible.builtin.set_fact:
-    grub_lines: "{{ (grub_content.content | b64decode).splitlines() }}"
+    _dict_linux: "{{ grub_cmdline_linux_base | combine(grub_cmdline_linux_extra) }}"
 
-- name: GRUB | Найти GRUB_CMDLINE_LINUX_DEFAULT
-  ansible.builtin.set_fact:
-    default_line: >-
+    _dict_default_raw: >-
       {{
-        (grub_lines
-        | select('search', '^GRUB_CMDLINE_LINUX_DEFAULT=')
-        | first) | default('')
+        grub_cmdline_default_base
+        | combine(grub_astra_parsec_params[grub_astra_mode] if ansible_facts['distribution'] == 'Astra Linux' else {})
+        | combine(grub_cmdline_default_extra)
       }}
 
-- name: GRUB | Найти GRUB_CMDLINE_LINUX_HARDENED
-  ansible.builtin.set_fact:
-    hardened_line: >-
+    _dict_hardened_raw: >-
       {{
-        (grub_lines
-        | select('search', '^GRUB_CMDLINE_LINUX_HARDENED=')
-        | first) | default('')
+        (
+          grub_cmdline_hardened_base
+          | combine(grub_astra_parsec_params[grub_astra_mode])
+          | combine(grub_cmdline_hardened_extra)
+        ) if ansible_facts['distribution'] == 'Astra Linux' else {}
       }}
 
-- name: GRUB | Настройка файла /etc/default/grub
+- name: GRUB | Исключить дубликаты и сформировать итоговые строки
+  ansible.builtin.set_fact:
+    grub_final_cmdline_linux: "{{ _dict_linux }}"
+    grub_final_cmdline_default: "{{ _dict_default_raw | dict2items | rejectattr('key', 'in', _dict_linux.keys()) | items2dict }}"
+    grub_final_cmdline_hardened: "{{ _dict_hardened_raw | dict2items | rejectattr('key', 'in', _dict_linux.keys()) | items2dict }}"
+
+- name: GRUB | Применить шаблон /etc/default/grub
   ansible.builtin.template:
     src: grub.j2
     dest: /etc/default/grub
     owner: root
     group: root
-    mode: '644'
-  register: grub_template_result
+    mode: '0644'
+    backup: true
+  notify: GRUB | Обновить конфигурацию GRUB
 
 - name: GRUB | Обновить конфигурацию GRUB в системе
   ansible.builtin.command: update-grub

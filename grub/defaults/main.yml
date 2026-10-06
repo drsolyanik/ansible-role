@@ -1,3 +1,39 @@
-#SPDX-License-Identifier: MIT-0
 ---
-# defaults file for grub
+# Параметры для GRUB_CMDLINE_LINUX
+grub_cmdline_linux_base:
+  panic: "10"
+
+grub_cmdline_linux_extra: {}
+
+# Параметры для GRUB_CMDLINE_LINUX_DEFAULT
+grub_cmdline_default_base:
+  quiet: null
+  init_on_alloc: "1"
+  slab_nomerge: null
+  randomize_kstack_offset: "1"
+  pti: "on"
+
+grub_cmdline_default_extra: {}
+
+# Параметры PARSEC для Astra Linux
+grub_astra_mode: "orel" # 'orel' или 'smolensk'
+
+grub_astra_parsec_params:
+  orel:
+    parsec.max_ilev: "0"
+    parsec.mac: "0"
+  smolensk:
+    parsec.max_ilev: "63"
+    parsec.mac: "1"
+
+# Параметры для GRUB_CMDLINE_LINUX_HARDENED
+grub_cmdline_hardened_base:
+  slub_debug: "P"
+  page_poison: "1"
+  slab_nomerge: null
+  pti: "on"
+  user.max_user_namespaces: "0"
+  kernel.kptr_restrict: "1"
+  vsyscall: "none"
+
+grub_cmdline_hardened_extra: {}

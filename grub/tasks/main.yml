@@ -4,12 +4,6 @@
     path: /etc/default/grub
   register: grub_file_stat
 
-- name: GRUB | Прочитать существующий /etc/default/grub
-  ansible.builtin.slurp:
-    src: /etc/default/grub
-  register: grub_content
-  when: grub_file_stat.stat.exists
-
 - name: GRUB | Подготовить итоговые словари параметров
   ansible.builtin.set_fact:
     _dict_linux: "{{ grub_cmdline_linux_base | combine(grub_cmdline_linux_extra) }}"

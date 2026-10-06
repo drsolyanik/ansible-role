@@ -25,7 +25,6 @@
       {{
         (
           grub_cmdline_hardened_base
-          | combine(grub_astra_parsec_params[grub_astra_mode])
           | combine(grub_cmdline_hardened_extra)
         ) if ansible_facts['distribution'] == 'Astra Linux' else {}
       }}

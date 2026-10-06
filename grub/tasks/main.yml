@@ -45,7 +45,3 @@
     mode: '0644'
     backup: true
   notify: GRUB | Обновить конфигурацию GRUB
-
-- name: GRUB | Обновить конфигурацию GRUB в системе
-  ansible.builtin.command: update-grub
-  when: grub_template_result.changed
